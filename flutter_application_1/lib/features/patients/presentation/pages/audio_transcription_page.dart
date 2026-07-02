@@ -1,6 +1,17 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:whisper_flutter_new/whisper_flutter_new.dart';
+
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/di/injection_container.dart';
+import '../../../../core/services/tflite_extractor.dart';
 import 'audio_confirmation_page.dart';
+
+enum _RecordState { idle, recording, transcribing }
 
 class AudioTranscriptionPage extends StatefulWidget {
   const AudioTranscriptionPage({super.key});
@@ -10,20 +21,211 @@ class AudioTranscriptionPage extends StatefulWidget {
 }
 
 class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
-  bool _isRecording = false;
+  // ── Model state ───────────────────────────────────────────────────────────
+  bool _modelReady = false;
+  bool _isDownloading = false;
+  double _downloadProgress = 0;
+  bool _downloadError = false;
 
-  void _toggleRecording() {
-    if (_isRecording) {
-      // Detener grabación → navegar a confirmación
-      setState(() => _isRecording = false);
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AudioConfirmationPage()),
-      );
+  // ── Recording / transcription state ───────────────────────────────────────
+  _RecordState _recordState = _RecordState.idle;
+  DateTime? _recordingStart;
+  String? _pendingAudioPath;
+
+  // ── NER processing state ──────────────────────────────────────────────────
+  bool _isProcessing = false;
+
+  // ── Core objects ──────────────────────────────────────────────────────────
+  final AudioRecorder _recorder = AudioRecorder();
+  final Whisper _whisper = Whisper(model: WhisperModel.tiny);
+  final TextEditingController _transcriptionController =
+      TextEditingController();
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+    _checkModel();
+  }
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    _transcriptionController.dispose();
+    super.dispose();
+  }
+
+  // ── Model management ──────────────────────────────────────────────────────
+
+  Future<String> _modelPath() async {
+    final dir = await getApplicationSupportDirectory();
+    return '${dir.path}/ggml-tiny.bin';
+  }
+
+  Future<void> _checkModel() async {
+    final path = await _modelPath();
+    if (File(path).existsSync()) {
+      if (mounted) setState(() => _modelReady = true);
     } else {
-      // Iniciar grabación
-      setState(() => _isRecording = true);
+      await _downloadModel();
     }
   }
+
+  Future<void> _downloadModel() async {
+    if (!mounted) return;
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0;
+      _downloadError = false;
+    });
+
+    final path = await _modelPath();
+    try {
+      await Dio().download(
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin',
+        path,
+        onReceiveProgress: (received, total) {
+          if (total > 0 && mounted) {
+            setState(() => _downloadProgress = received / total);
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _modelReady = true;
+        });
+      }
+    } catch (_) {
+      try {
+        File(path).deleteSync();
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _downloadError = true;
+        });
+      }
+    }
+  }
+
+  // ── Recording ─────────────────────────────────────────────────────────────
+
+  Future<void> _toggleRecording() async {
+    if (_recordState == _RecordState.recording) {
+      final path = await _recorder.stop();
+
+      final elapsed = _recordingStart != null
+          ? DateTime.now().difference(_recordingStart!).inSeconds
+          : 99;
+
+      if (elapsed < 2) {
+        if (mounted) setState(() => _recordState = _RecordState.idle);
+        _showSnack(
+            'Grabación muy corta. Habla más tiempo e intenta de nuevo.');
+        if (path != null) _deleteFile(path);
+        return;
+      }
+
+      if (path == null) {
+        if (mounted) setState(() => _recordState = _RecordState.idle);
+        return;
+      }
+
+      _pendingAudioPath = path;
+      if (mounted) setState(() => _recordState = _RecordState.transcribing);
+      await _transcribeAudio(path);
+    } else {
+      _transcriptionController.clear();
+      _recordingStart = DateTime.now();
+
+      final tempDir = await getTemporaryDirectory();
+      final audioPath =
+          '${tempDir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: audioPath,
+      );
+
+      if (mounted) setState(() => _recordState = _RecordState.recording);
+    }
+  }
+
+  // ── Transcription ─────────────────────────────────────────────────────────
+
+  Future<void> _transcribeAudio(String audioPath) async {
+    try {
+      final response = await _whisper.transcribe(
+        transcribeRequest: TranscribeRequest(
+          audio: audioPath,
+          language: 'es',
+          isTranslate: false,
+        ),
+      );
+
+      final text = response.text.trim();
+      if (!mounted) return;
+      setState(() {
+        _transcriptionController.text = text;
+        _recordState = _RecordState.idle;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _recordState = _RecordState.idle);
+      _showSnack(
+          'No se pudo transcribir el audio. Puedes escribir el texto manualmente.');
+    } finally {
+      _deleteFile(audioPath);
+    }
+  }
+
+  // ── NER analysis ──────────────────────────────────────────────────────────
+
+  Future<void> _analyzeText(String text) async {
+    setState(() => _isProcessing = true);
+    try {
+      final extractor = sl<NerExtractor>();
+      final fields = await Future(() => extractor.infer(text));
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AudioConfirmationPage(
+            originalText: text,
+            clinicalFields: fields,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  void _showSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  void _deleteFile(String path) {
+    try {
+      File(path).deleteSync();
+    } catch (_) {}
+  }
+
+  bool get _micEnabled =>
+      _modelReady &&
+      _recordState != _RecordState.transcribing &&
+      !_isProcessing;
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +250,10 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Column(
                 children: [
+                  if (_isDownloading || _downloadError)
+                    _buildModelCard(),
+                  if (_isDownloading || _downloadError)
+                    const SizedBox(height: 12),
                   _buildTranscriptionCard(),
                   const SizedBox(height: 12),
                   _buildAudioControls(),
@@ -65,6 +271,120 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
     );
   }
 
+  // ── Model download card ───────────────────────────────────────────────────
+
+  Widget _buildModelCard() {
+    if (_downloadError) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFCA5A5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.wifi_off_rounded,
+                    color: Color(0xFFDC2626), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No se pudo descargar el modelo.',
+                    style: TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Conéctate a internet para descargarlo la primera vez.\nDespués funcionará 100% sin conexión.',
+              style: TextStyle(
+                color: Color(0xFF991B1B),
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _downloadModel,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Reintentar descarga',
+                    style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC2626),
+                  side: const BorderSide(color: Color(0xFFDC2626)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Downloading
+    final pct = (_downloadProgress * 100).toStringAsFixed(0);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.download_rounded,
+                  color: AppColors.info, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Descargando modelo de transcripción ($pct%)...',
+                  style: const TextStyle(
+                    color: AppColors.info,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Solo esta vez — después funciona sin internet.',
+            style: TextStyle(
+                color: AppColors.info, fontSize: 11),
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: _downloadProgress,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFBFDBFE),
+              color: AppColors.info,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Secondary header ──────────────────────────────────────────────────────
 
   Widget _buildSecondaryHeader(BuildContext context) {
@@ -75,7 +395,8 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 22),
+            child: const Icon(Icons.arrow_back,
+                color: AppColors.textPrimary, size: 22),
           ),
           const SizedBox(width: 14),
           const Expanded(
@@ -88,7 +409,8 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
               ),
             ),
           ),
-          const Icon(Icons.cloud_outlined, color: AppColors.textSecondary, size: 22),
+          const Icon(Icons.cloud_outlined,
+              color: AppColors.textSecondary, size: 22),
         ],
       ),
     );
@@ -122,9 +444,12 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
   // ── Transcription card ────────────────────────────────────────────────────
 
   Widget _buildTranscriptionCard() {
+    final fieldEnabled =
+        _recordState == _RecordState.idle && !_isProcessing;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -147,52 +472,139 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 44),
-          Center(
-            child: _isRecording
-                ? Column(
-                    children: [
-                      const Icon(
-                        Icons.graphic_eq_rounded,
-                        size: 60,
-                        color: AppColors.primary,
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Escuchando al paciente...',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
-                          height: 1.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Icon(
-                        Icons.hearing_rounded,
-                        size: 60,
-                        color: AppColors.textMuted.withValues(alpha: 0.45),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Inicia la grabación para comenzar la\ntranscripción del paciente...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
-                          height: 1.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _transcriptionController,
+            enabled: fieldEnabled,
+            minLines: 3,
+            maxLines: 6,
+            style: const TextStyle(
+                fontSize: 13, color: AppColors.textPrimary, height: 1.5),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppColors.inputBackground,
+              hintText:
+                  'Habla o escribe la descripción del paciente…\n'
+                  'Ej: "Mujer de 34 años, 62 kg, temperatura 38.5, presión 120/80"',
+              hintStyle: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textMuted,
+                height: 1.5,
+              ),
+              contentPadding: const EdgeInsets.all(12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+            ),
           ),
-          const SizedBox(height: 44),
+          const SizedBox(height: 12),
+          _buildStatusRow(),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isProcessing ||
+                      _recordState != _RecordState.idle
+                  ? null
+                  : () {
+                      final text =
+                          _transcriptionController.text.trim();
+                      if (text.isEmpty) {
+                        _showSnack(
+                            'Escribe o dicta algo antes de analizar.');
+                        return;
+                      }
+                      _analyzeText(text);
+                    },
+              icon: const Icon(Icons.biotech_rounded, size: 18),
+              label: const Text(
+                'Analizar texto con IA',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.textMuted,
+                disabledForegroundColor: Colors.white70,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusRow() {
+    if (_isProcessing) {
+      return Row(children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: AppColors.primary),
+        ),
+        const SizedBox(width: 10),
+        const Text('Analizando con IA…',
+            style: TextStyle(
+                fontSize: 12,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w500)),
+      ]);
+    }
+    if (_recordState == _RecordState.transcribing) {
+      return Row(children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: const Color(0xFF7C3AED)),
+        ),
+        const SizedBox(width: 10),
+        const Text('Transcribiendo con Whisper…',
+            style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF7C3AED),
+                fontWeight: FontWeight.w500)),
+      ]);
+    }
+    if (_recordState == _RecordState.recording) {
+      return Row(children: [
+        const Icon(Icons.graphic_eq_rounded,
+            color: Color(0xFFDC2626), size: 18),
+        const SizedBox(width: 8),
+        const Text('Grabando audio…',
+            style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFFDC2626),
+                fontWeight: FontWeight.w500)),
+      ]);
+    }
+    if (_isDownloading) {
+      return const Text(
+        'Descargando modelo — el micrófono estará disponible al terminar.',
+        style: TextStyle(
+            fontSize: 11, color: AppColors.textMuted, height: 1.4),
+      );
+    }
+    return const Text(
+      'Presiona el micrófono para grabar, o escribe el texto y presiona Analizar.',
+      style: TextStyle(
+          fontSize: 11, color: AppColors.textMuted, height: 1.4),
     );
   }
 
@@ -207,10 +619,9 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
-                'Calidad de audio',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-              ),
+              const Text('Calidad de audio',
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.textMuted)),
               const SizedBox(width: 8),
               _buildAudioBars(),
             ],
@@ -220,7 +631,8 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.tune_rounded, color: AppColors.primary, size: 15),
+                Icon(Icons.tune_rounded,
+                    color: AppColors.primary, size: 15),
                 SizedBox(width: 4),
                 Text(
                   'Añadir nota\nmanual',
@@ -242,6 +654,7 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
 
   Widget _buildAudioBars() {
     const heights = [5.0, 9.0, 14.0, 9.0, 5.0];
+    final isRec = _recordState == _RecordState.recording;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: heights.map((h) {
@@ -250,7 +663,9 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
           height: h,
           margin: const EdgeInsets.only(right: 2),
           decoration: BoxDecoration(
-            color: _isRecording ? const Color(0xFFDC2626) : AppColors.success,
+            color: isRec
+                ? const Color(0xFFDC2626)
+                : AppColors.success,
             borderRadius: BorderRadius.circular(2),
           ),
         );
@@ -261,7 +676,42 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
   // ── Mic card ──────────────────────────────────────────────────────────────
 
   Widget _buildMicCard() {
-    final isRec = _isRecording;
+    final isRec = _recordState == _RecordState.recording;
+    final isTranscribing = _recordState == _RecordState.transcribing;
+
+    Color btnColor;
+    IconData btnIcon;
+    String titleText;
+    String subtitleText;
+
+    if (isTranscribing || _isProcessing) {
+      btnColor = AppColors.textMuted;
+      btnIcon = Icons.mic_rounded;
+      titleText = isTranscribing ? 'Transcribiendo…' : 'Procesando…';
+      subtitleText = isTranscribing
+          ? 'Whisper está analizando el audio.\nEsto puede tardar unos segundos.'
+          : 'El modelo NER está extrayendo los datos clínicos.';
+    } else if (isRec) {
+      btnColor = const Color(0xFFDC2626);
+      btnIcon = Icons.stop_rounded;
+      titleText = 'Grabando...\nPresiona para analizar';
+      subtitleText =
+          'El micrófono está capturando tu voz.\nPresiona stop cuando termines.';
+    } else {
+      btnColor = _micEnabled ? AppColors.primary : AppColors.textMuted;
+      btnIcon = Icons.mic_rounded;
+      titleText = _isDownloading
+          ? 'Descargando modelo…'
+          : _downloadError
+              ? 'Modelo no disponible'
+              : 'Presiona y empieza a\nhablar con tu paciente';
+      subtitleText = _isDownloading
+          ? 'Espera a que termine la descarga\npara usar el micrófono.'
+          : _downloadError
+              ? 'Descarga el modelo para usar el micrófono,\no escribe el texto manualmente.'
+              : 'El audio se procesará localmente con Whisper\nsin enviar datos a internet.';
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
@@ -279,47 +729,46 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
       child: Column(
         children: [
           GestureDetector(
-            onTap: _toggleRecording,
+            onTap: _micEnabled ? _toggleRecording : null,
             child: Container(
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: isRec ? const Color(0xFFDC2626) : AppColors.primary,
+                color: btnColor,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: (isRec ? const Color(0xFFDC2626) : AppColors.primary)
-                        .withValues(alpha: 0.35),
+                    color: btnColor.withValues(alpha: 0.35),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Icon(
-                isRec ? Icons.stop_rounded : Icons.mic_rounded,
-                color: Colors.white,
-                size: 30,
-              ),
+              child: isTranscribing
+                  ? const Padding(
+                      padding: EdgeInsets.all(18),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Icon(btnIcon, color: Colors.white, size: 30),
             ),
           ),
           const SizedBox(height: 18),
           Text(
-            isRec
-                ? 'Grabando...\nPresiona para detener'
-                : 'Presiona y empieza a\nhablar con tu paciente',
+            titleText,
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.bold,
-              color: isRec ? const Color(0xFFDC2626) : AppColors.textPrimary,
+              color: isRec
+                  ? const Color(0xFFDC2626)
+                  : AppColors.textPrimary,
               height: 1.35,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 10),
           Text(
-            isRec
-                ? 'El sistema está capturando y procesando\nel audio en tiempo real.'
-                : 'El sistema filtrará el ruido ambiental y\ntranscribirá automáticamente los\nsíntomas detectados.',
+            subtitleText,
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -399,5 +848,4 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
       ),
     );
   }
-
 }
