@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/di/injection_container.dart';
+import '../../data/models/patient_record.dart';
+import '../../data/repositories/patient_local_repository.dart';
 
 class AudioConfirmationPage extends StatefulWidget {
-  const AudioConfirmationPage({super.key});
+  final Map<String, dynamic> clinicalFields;
+  final String originalText;
+
+  const AudioConfirmationPage({
+    super.key,
+    required this.clinicalFields,
+    required this.originalText,
+  });
 
   @override
   State<AudioConfirmationPage> createState() => _AudioConfirmationPageState();
@@ -11,18 +21,50 @@ class AudioConfirmationPage extends StatefulWidget {
 class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   bool _isEditing = false;
 
+  // ── Perfil del paciente ────────────────────────────────────────────────────
   late final TextEditingController _nameController;
   late final TextEditingController _ageController;
   late final TextEditingController _genderController;
   late final TextEditingController _locationController;
 
+  // ── Datos clínicos vitales ─────────────────────────────────────────────────
+  late final TextEditingController _categoryController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _heightController;
+  late final TextEditingController _systolicController;
+  late final TextEditingController _diastolicController;
+  late final TextEditingController _glucoseController;
+  late final TextEditingController _tempController;
+  late final TextEditingController _heartRateController;
+  late final TextEditingController _durationController;
+
+  bool _detected(String key) => widget.clinicalFields.containsKey(key);
+
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Juan Pérez');
-    _ageController = TextEditingController(text: '45 años');
-    _genderController = TextEditingController(text: 'Masculino');
-    _locationController = TextEditingController(text: 'San Borja, Lima');
+    final f = widget.clinicalFields;
+
+    _nameController     = TextEditingController(text: '');
+    _ageController      = TextEditingController(text: f['edad']?.toString() ?? '');
+    _genderController   = TextEditingController(
+      text: f['sexo'] == 'M'
+          ? 'Masculino'
+          : f['sexo'] == 'F'
+              ? 'Femenino'
+              : '',
+    );
+    _locationController = TextEditingController(text: '');
+
+    _categoryController  = TextEditingController(text: f['categoria_sintoma']?.toString() ?? '');
+    _weightController    = TextEditingController(text: f['peso_kg']?.toString() ?? '');
+    _heightController    = TextEditingController(text: f['talla_cm']?.toString() ?? '');
+    _systolicController  = TextEditingController(text: f['presion_sistolica']?.toString() ?? '');
+    _diastolicController = TextEditingController(text: f['presion_diastolica']?.toString() ?? '');
+    _glucoseController   = TextEditingController(text: f['glucosa_mg_dl']?.toString() ?? '');
+    _tempController      = TextEditingController(text: f['temperatura_c']?.toString() ?? '');
+    _heartRateController = TextEditingController(text: f['frecuencia_cardiaca_bpm']?.toString() ?? '');
+    _durationController  = TextEditingController(text: f['duracion_sintomas_dias']?.toString() ?? '');
   }
 
   @override
@@ -31,10 +73,66 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _ageController.dispose();
     _genderController.dispose();
     _locationController.dispose();
+    _categoryController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
+    _systolicController.dispose();
+    _diastolicController.dispose();
+    _glucoseController.dispose();
+    _tempController.dispose();
+    _heartRateController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
+  // ── Paso 3: guardar en SQLite antes del snackbar ──────────────────────────
+
   Future<void> _saveAndSync() async {
+    bool saved = false;
+    try {
+      await sl<PatientLocalRepository>().save(
+        PatientRecord(
+          nombrePaciente: _nameController.text.trim(),
+          localidad: _locationController.text.trim(),
+          textoOriginal: widget.originalText,
+          camposExtraidos: widget.clinicalFields,
+          fechaCaptura: DateTime.now(),
+        ),
+      );
+      saved = true;
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: Colors.white, size: 22),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'No se pudo guardar el registro. Intenta de nuevo.',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
@@ -86,6 +184,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   _buildPatientCard(),
                   const SizedBox(height: 14),
                   _buildClinicalCard(),
+                  const SizedBox(height: 14),
+                  _buildVitalsCard(),
                   const SizedBox(height: 14),
                   _buildLocationCard(),
                   const SizedBox(height: 20),
@@ -232,11 +332,11 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           ],
         ),
         const SizedBox(height: 16),
-        _buildField('Nombre Completo', _nameController),
+        _buildField('Nombre Completo', _nameController, isDetected: false, alwaysEditable: true),
         const SizedBox(height: 12),
-        _buildField('Edad', _ageController),
+        _buildField('Edad', _ageController, isDetected: _detected('edad')),
         const SizedBox(height: 12),
-        _buildField('Género', _genderController),
+        _buildField('Género', _genderController, isDetected: _detected('sexo')),
       ],
     );
   }
@@ -244,6 +344,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   // ── Card: Análisis Clínico (IA) ───────────────────────────────────────────
 
   Widget _buildClinicalCard() {
+    final detectedCount = widget.clinicalFields.length;
     return _Card(
       children: [
         Row(
@@ -267,9 +368,9 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'Confianza:\n96%',
-                style: TextStyle(
+              child: Text(
+                '$detectedCount / 11\ncampos',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -282,7 +383,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'Síntomas Detectados',
+          'Categoría de Síntoma',
           style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
@@ -290,55 +391,67 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           ),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: const [
-            _SymptomTag(
-              icon: Icons.thermostat_rounded,
-              color: Color(0xFFDC2626),
-              name: 'Fiebre',
-              intensity: 'ALTA',
-            ),
-            _SymptomTag(
-              icon: Icons.air_rounded,
-              color: Color(0xFF2563EB),
-              name: 'Tos Seca',
-              intensity: 'PERSISTENTE',
-            ),
-            _SymptomTag(
-              icon: Icons.fitness_center_rounded,
-              color: Color(0xFFD97706),
-              name: 'Dolor Muscular',
-              intensity: 'MODERADO',
-            ),
-          ],
-        ),
+        _isEditing
+            ? _buildField('Categoría', _categoryController, isDetected: _detected('categoria_sintoma'))
+            : _detected('categoria_sintoma')
+                ? _CategoryChip(label: _categoryController.text)
+                : const _UndetectedRow(label: 'Categoría no detectada'),
         const SizedBox(height: 16),
         const Divider(height: 1, color: Color(0xFFF3F4F6)),
         const SizedBox(height: 14),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.vaccines_outlined, color: AppColors.primary, size: 17),
+            const Icon(Icons.thermostat_rounded, color: AppColors.primary, size: 17),
             const SizedBox(width: 8),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Vacunación Previa',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Esquema Completo (Verificado)',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Temperatura (°C)',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  _isEditing
+                      ? _buildInlineField(_tempController)
+                      : _detected('temperatura_c')
+                          ? Text(
+                              '${_tempController.text} °C',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            )
+                          : const _UndetectedRow(label: 'No detectada'),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Duración síntomas (días)',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 3),
+                  _isEditing
+                      ? _buildInlineField(_durationController)
+                      : _detected('duracion_sintomas_dias')
+                          ? Text(
+                              '${_durationController.text} días',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            )
+                          : const _UndetectedRow(label: 'No detectada'),
+                ],
+              ),
             ),
           ],
         ),
@@ -372,6 +485,74 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     );
   }
 
+  // ── Card: Datos Clínicos Vitales ──────────────────────────────────────────
+
+  Widget _buildVitalsCard() {
+    return _Card(
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.monitor_heart_outlined, color: AppColors.primary, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Datos Clínicos Vitales',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildField('Peso (kg)', _weightController,
+                  isDetected: _detected('peso_kg')),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildField('Talla (cm)', _heightController,
+                  isDetected: _detected('talla_cm')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildField('Presión Sistólica', _systolicController,
+                  isDetected: _detected('presion_sistolica')),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildField('Presión Diastólica', _diastolicController,
+                  isDetected: _detected('presion_diastolica')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildField('Glucosa (mg/dL)', _glucoseController,
+                  isDetected: _detected('glucosa_mg_dl')),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildField('Frec. Cardíaca (bpm)', _heartRateController,
+                  isDetected: _detected('frecuencia_cardiaca_bpm')),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   // ── Card: Ubicación + mini mapa ───────────────────────────────────────────
 
   Widget _buildLocationCard() {
@@ -392,7 +573,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           ],
         ),
         const SizedBox(height: 14),
-        _buildField('Distrito Detectado', _locationController),
+        _buildField('Localidad', _locationController, isDetected: false, alwaysEditable: true),
         const SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
@@ -500,7 +681,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  Widget _buildField(String label, TextEditingController controller) {
+  Widget _buildField(String label, TextEditingController controller,
+      {bool isDetected = true, bool alwaysEditable = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -509,7 +691,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 4),
-        _isEditing
+        (alwaysEditable || _isEditing)
             ? TextFormField(
                 controller: controller,
                 style: const TextStyle(
@@ -539,15 +721,46 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   ),
                 ),
               )
-            : Text(
-                controller.text,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+            : isDetected
+                ? Text(
+                    controller.text,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  )
+                : const _UndetectedRow(),
       ],
+    );
+  }
+
+  // Variante compacta para campos dentro de filas (temperatura, duración).
+  Widget _buildInlineField(TextEditingController controller) {
+    return TextFormField(
+      controller: controller,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: AppColors.inputBackground,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
     );
   }
 }
@@ -582,57 +795,58 @@ class _Card extends StatelessWidget {
   }
 }
 
-// ── Symptom tag chip ──────────────────────────────────────────────────────────
+// ── "No detectado" row ────────────────────────────────────────────────────────
 
-class _SymptomTag extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String name;
-  final String intensity;
+class _UndetectedRow extends StatelessWidget {
+  final String label;
+  const _UndetectedRow({this.label = 'No detectado'});
 
-  const _SymptomTag({
-    required this.icon,
-    required this.color,
-    required this.name,
-    required this.intensity,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.help_outline, size: 13, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontStyle: FontStyle.italic,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Category chip ─────────────────────────────────────────────────────────────
+
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  const _CategoryChip({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 16),
+          const Icon(Icons.category_outlined, color: AppColors.primary, size: 15),
           const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Text(
-                intensity,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ],
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
           ),
         ],
       ),
@@ -645,7 +859,6 @@ class _SymptomTag extends StatelessWidget {
 class _MiniMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // Background
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()..color = const Color(0xFF0D1B2A),
@@ -661,7 +874,6 @@ class _MiniMapPainter extends CustomPainter {
       ..strokeWidth = 1.6
       ..style = PaintingStyle.stroke;
 
-    // Horizontal streets
     final hLines = [0.18, 0.38, 0.55, 0.72, 0.88];
     for (final t in hLines) {
       canvas.drawLine(
@@ -671,7 +883,6 @@ class _MiniMapPainter extends CustomPainter {
       );
     }
 
-    // Vertical streets
     final vLines = [0.12, 0.28, 0.44, 0.6, 0.76, 0.9];
     for (final t in vLines) {
       canvas.drawLine(
@@ -681,7 +892,6 @@ class _MiniMapPainter extends CustomPainter {
       );
     }
 
-    // Location dot
     final dotX = size.width * 0.5;
     final dotY = size.height * 0.45;
 
@@ -690,11 +900,7 @@ class _MiniMapPainter extends CustomPainter {
       14,
       Paint()..color = AppColors.primary.withValues(alpha: 0.18),
     );
-    canvas.drawCircle(
-      Offset(dotX, dotY),
-      5,
-      Paint()..color = AppColors.primary,
-    );
+    canvas.drawCircle(Offset(dotX, dotY), 5, Paint()..color = AppColors.primary);
     canvas.drawCircle(
       Offset(dotX, dotY),
       5,

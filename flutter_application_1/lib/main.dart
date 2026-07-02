@@ -7,6 +7,7 @@ import 'features/auth/presentation/providers/auth_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await di.init();
+  await di.sl.allReady();
   runApp(const EpiSurveillanceApp());
 }
 

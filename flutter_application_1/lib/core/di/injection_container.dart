@@ -1,11 +1,13 @@
 import 'package:get_it/get_it.dart';
 import '../network/dio_client.dart';
 import '../services/token_storage.dart';
+import '../services/tflite_extractor.dart';
 import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/i_auth_repository.dart';
 import '../../features/auth/domain/usecases/login_usecase.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/patients/data/repositories/patient_local_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -20,6 +22,7 @@ Future<void> init() async {
   sl.registerLazySingleton<IAuthRepository>(
     () => AuthRepositoryImpl(sl()),
   );
+  sl.registerLazySingleton(() => PatientLocalRepository());
 
   // ── Data Sources ──────────────────────────────────────────────
   sl.registerLazySingleton<IAuthRemoteDataSource>(
@@ -29,4 +32,13 @@ Future<void> init() async {
   // ── Core ──────────────────────────────────────────────────────
   sl.registerLazySingleton(() => DioClient(sl()).dio);
   sl.registerLazySingleton(() => TokenStorage());
+
+  // ── AI Services ───────────────────────────────────────────────
+  sl.registerSingletonAsync<NerExtractor>(
+    () => NerExtractor.fromAssets(
+      modelAsset:  'assets/model/ner_tflite_v2.tflite',
+      vocabAsset:  'assets/model/tflite_vocab_v2.json',
+      labelsAsset: 'assets/model/tflite_labels_v2.json',
+    ),
+  );
 }
