@@ -1,6 +1,9 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../dashboard/presentation/pages/dashboard_page.dart';
+import '../providers/auth_provider.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -19,6 +22,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _acceptTerms = false;
+  bool _isLoading = false;
+  String? _errorText;
 
   @override
   void dispose() {
@@ -29,9 +34,27 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-    // TODO: conectar con backend cuando esté listo
+    setState(() { _isLoading = true; _errorText = null; });
+
+    final provider = context.read<AuthProvider>();
+    await provider.register(
+      nombre: _nameController.text.trim(),
+      correo: _emailController.text.trim().toLowerCase(),
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (provider.status == AuthStatus.success) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
+      );
+    } else {
+      setState(() => _errorText = provider.errorMessage ?? 'Error al crear la cuenta.');
+    }
   }
 
   @override
@@ -71,6 +94,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   _buildFormCard(),
                   const SizedBox(height: 16),
                   _buildRegisterButton(),
+                  if (_errorText != null) ...[
+                    const SizedBox(height: 12),
+                    _buildErrorBanner(),
+                  ],
                   const SizedBox(height: 20),
                   _buildLoginLink(context),
                   const SizedBox(height: 16),
@@ -188,8 +215,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 hint: 'Ej: Dra. María García',
                 icon: Icons.person_outline_rounded,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Ingrese su nombre completo' : null,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Ingrese su nombre completo';
+                if (v.trim().length < 3) return 'Mínimo 3 caracteres';
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             _buildFieldLabel('Correo Electrónico'),
@@ -203,7 +233,8 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Ingrese su correo';
-                if (!v.contains('@')) return 'Correo no válido';
+                final emailReg = RegExp(r'^[\w.%+-]+@[\w.-]+\.[a-zA-Z]{2,}$');
+                if (!emailReg.hasMatch(v.trim())) return 'Formato de correo no válido';
                 return null;
               },
             ),
@@ -230,7 +261,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
               validator: (v) =>
-                  (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
+                  (v == null || v.length < 8) ? 'Mínimo 8 caracteres' : null,
             ),
             const SizedBox(height: 16),
             _buildFieldLabel('Confirmar Contraseña'),
@@ -338,7 +369,7 @@ class _RegisterPageState extends State<RegisterPage> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton.icon(
-        onPressed: _acceptTerms ? _handleRegister : null,
+        onPressed: (_acceptTerms && !_isLoading) ? _handleRegister : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.45),
@@ -348,11 +379,41 @@ class _RegisterPageState extends State<RegisterPage> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
-        icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-        label: const Text(
-          'Registrarse',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        icon: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2.5),
+              )
+            : const Icon(Icons.person_add_alt_1_rounded, size: 20),
+        label: Text(
+          _isLoading ? 'Creando cuenta...' : 'Registrarse',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEE2E2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorText!,
+              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,8 +1,12 @@
+import '../../../../core/constants/user_roles.dart';
+
 class AuthEntity {
   final String token;
   final String userId;
   final String name;
   final String role;
+
+  UserRole get userRole => UserRoleExtension.fromString(role);
 
   // Constructor normal
   const AuthEntity({
