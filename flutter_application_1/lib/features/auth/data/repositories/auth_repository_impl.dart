@@ -11,11 +11,9 @@ class AuthRepositoryImpl implements IAuthRepository {
   Future<AuthEntity> login({
     required String identifier,
     required String password,
-    required bool rememberSession,
   }) =>
       _remoteDataSource.login(
         identifier: identifier,
-        password: password,
-        rememberSession: rememberSession,
+        password:   password,
       );
 }

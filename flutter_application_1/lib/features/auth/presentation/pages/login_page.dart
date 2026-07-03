@@ -32,7 +32,6 @@ class _LoginPageState extends State<LoginPage> {
     context.read<AuthProvider>().login(
           identifier: _identifierController.text.trim(),
           password: _passwordController.text,
-          rememberSession: _rememberSession,
         );
   }
 

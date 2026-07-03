@@ -9,11 +9,9 @@ class LoginUseCase {
   Future<AuthEntity> call({
     required String identifier,
     required String password,
-    required bool rememberSession,
   }) =>
       _repository.login(
         identifier: identifier,
-        password: password,
-        rememberSession: rememberSession,
+        password:   password,
       );
 }

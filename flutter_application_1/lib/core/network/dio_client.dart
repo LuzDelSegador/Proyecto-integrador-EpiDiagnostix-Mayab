@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../constants/app_config.dart';
 import '../services/token_storage.dart';
 
 class DioClient {
@@ -7,8 +8,7 @@ class DioClient {
   DioClient(TokenStorage tokenStorage) {
     dio = Dio(
       BaseOptions(
-        // TODO: reemplazar con la URL base real del backend
-        baseUrl: 'https://api.episurveillance.gob/v1',
+        baseUrl: kBaseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
@@ -36,6 +36,7 @@ class _TokenInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    // Lee el caché en memoria (síncrono) — se carga en app start via hasToken().
     final token = _tokenStorage.token;
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -46,6 +47,8 @@ class _TokenInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (err.response?.statusCode == 401) {
+      // Fire-and-forget: _cachedToken se limpia sincrónicamente al inicio
+      // de clearToken() antes del primer await.
       _tokenStorage.clearToken();
     }
     handler.next(err);
