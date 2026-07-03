@@ -6,7 +6,6 @@ abstract class IAuthRemoteDataSource {
   Future<AuthModel> login({
     required String identifier,
     required String password,
-    required bool rememberSession,
   });
 }
 
@@ -19,15 +18,13 @@ class AuthRemoteDataSource implements IAuthRemoteDataSource {
   Future<AuthModel> login({
     required String identifier,
     required String password,
-    required bool rememberSession,
   }) async {
     try {
       final response = await _dio.post(
         '/auth/login',
         data: {
-          'identifier': identifier,
-          'password': password,
-          'remember_session': rememberSession,
+          'correo':     identifier,
+          'contrasena': password,
         },
       );
       return AuthModel.fromJson(response.data as Map<String, dynamic>);

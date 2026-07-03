@@ -67,9 +67,10 @@ class _DashboardPageState extends State<DashboardPage> {
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
         icon: const Icon(Icons.account_circle_outlined, color: AppColors.textPrimary, size: 26),
-        onPressed: () {
-          context.read<AuthProvider>().resetStatus();
-          Navigator.of(context).pushReplacement(
+        onPressed: () async {
+          final navigator = Navigator.of(context);
+          await context.read<AuthProvider>().logout();
+          navigator.pushReplacement(
             MaterialPageRoute(builder: (_) => const LoginPage()),
           );
         },

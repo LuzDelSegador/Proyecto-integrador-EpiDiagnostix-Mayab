@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
-import '../../../map/presentation/pages/mapa_page.dart';
-import '../../../services/presentation/pages/servicios_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../map/presentation/pages/mapa_page.dart';
+import '../../../patients/data/models/paciente.dart';
+import '../../../patients/data/repositories/patient_local_repository.dart';
+import '../../../patients/presentation/pages/paciente_detalle_page.dart';
+import '../../../services/presentation/pages/servicios_page.dart';
 
 class CasosPage extends StatefulWidget {
   const CasosPage({super.key});
@@ -18,10 +23,40 @@ class _CasosPageState extends State<CasosPage> {
   int _currentNavIndex = 2;
   final _searchController = TextEditingController();
 
+  List<PacienteConResumen> _pacientes = [];
+  bool _isLoading = true;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+    _loadPacientes();
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), _loadPacientes);
+  }
+
+  Future<void> _loadPacientes() async {
+    final filtro = _searchController.text.trim();
+    final lista = await sl<PatientLocalRepository>()
+        .getPacientes(filtro.isEmpty ? null : filtro);
+    if (mounted) {
+      setState(() {
+        _pacientes = lista;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -33,49 +68,7 @@ class _CasosPageState extends State<CasosPage> {
         children: [
           _buildSyncBanner(),
           _buildSearchBar(),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              children: [
-                _buildCaseCard(
-                  name: 'Juan Pérez',
-                  caseId: '#C-902341',
-                  status: _CaseStatus.confirmed,
-                  date: '12 Oct 2023',
-                  location: 'Distrito Central, Sector 4',
-                  symptoms: const ['Fiebre alta', 'Tos seca', 'Mialgia'],
-                ),
-                const SizedBox(height: 10),
-                _buildCaseCard(
-                  name: 'María García',
-                  caseId: '#C-902342',
-                  status: _CaseStatus.suspicious,
-                  date: '14 Oct 2023',
-                  location: 'Aldea Las Nubes',
-                  symptoms: const ['Cefalea', 'Fatiga'],
-                ),
-                const SizedBox(height: 10),
-                _buildCaseCard(
-                  name: 'Roberto Gómez',
-                  caseId: '#C-902345',
-                  status: _CaseStatus.monitoring,
-                  date: '10 Oct 2023',
-                  location: 'Villa Norte, Bloque A',
-                  symptoms: const ['Asintomático'],
-                ),
-                const SizedBox(height: 10),
-                _buildCaseCard(
-                  name: 'Ana Martínez',
-                  caseId: '#C-902350',
-                  status: _CaseStatus.confirmed,
-                  date: '15 Oct 2023',
-                  location: 'Casco Urbano',
-                  symptoms: const ['Dificultad respiratoria', 'Fiebre'],
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -100,7 +93,7 @@ class _CasosPageState extends State<CasosPage> {
         },
       ),
       title: const Text(
-        'Listado de Casos',
+        'Listado de Pacientes',
         style: TextStyle(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.bold,
@@ -111,7 +104,7 @@ class _CasosPageState extends State<CasosPage> {
       actions: [
         IconButton(
           icon: const Icon(Icons.sync_rounded, color: AppColors.primary, size: 24),
-          onPressed: () {},
+          onPressed: _loadPacientes,
         ),
       ],
     );
@@ -123,11 +116,11 @@ class _CasosPageState extends State<CasosPage> {
     return Container(
       color: const Color(0xFF1B6E52),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.cloud_done_outlined, color: Colors.white70, size: 16),
-          const SizedBox(width: 8),
-          const Expanded(
+          Icon(Icons.cloud_done_outlined, color: Colors.white70, size: 16),
+          SizedBox(width: 8),
+          Expanded(
             child: Text(
               'Visualizando datos locales — Sincronizado hace 2 min',
               style: TextStyle(color: Colors.white, fontSize: 11, height: 1.3),
@@ -157,7 +150,7 @@ class _CasosPageState extends State<CasosPage> {
                 controller: _searchController,
                 style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                 decoration: const InputDecoration(
-                  hintText: 'Buscar por nombre o ID',
+                  hintText: 'Buscar por nombre',
                   hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   prefixIcon: Icon(Icons.search_rounded,
                       color: AppColors.textMuted, size: 20),
@@ -167,149 +160,160 @@ class _CasosPageState extends State<CasosPage> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: const Icon(Icons.tune_rounded,
-                color: AppColors.textSecondary, size: 20),
-          ),
         ],
       ),
     );
   }
 
-  // ── Case card ─────────────────────────────────────────────────────────────
+  // ── Body ──────────────────────────────────────────────────────────────────
 
-  Widget _buildCaseCard({
-    required String name,
-    required String caseId,
-    required _CaseStatus status,
-    required String date,
-    required String location,
-    required List<String> symptoms,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_pacientes.isEmpty) {
+      return _buildEmptyState();
+    }
+    return RefreshIndicator(
+      onRefresh: _loadPacientes,
+      color: AppColors.primary,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        itemCount: _pacientes.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) => _buildPacienteCard(_pacientes[i]),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: name + badge
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'ID: $caseId',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _StatusBadge(status: status),
-              ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.folder_open_outlined,
+                size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            const Text(
+              'No hay pacientes registrados aún.\nUsa el micrófono para registrar la primera consulta.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textMuted,
+                height: 1.5,
+              ),
             ),
-          ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
-          // Body: date + location + symptoms
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildInfoField('REGISTRO', date),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Paciente card ─────────────────────────────────────────────────────────
+
+  Widget _buildPacienteCard(PacienteConResumen r) {
+    final p      = r.paciente;
+    final semana = r.visitasEstaSemana;
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PacienteDetallePage(paciente: r)),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    child: Text(
+                      _initials(p.nombreCompleto),
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                    Expanded(
-                      child: _buildInfoField('UBICACIÓN', location),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'SÍNTOMAS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMuted,
-                    letterSpacing: 0.5,
                   ),
-                ),
-                const SizedBox(height: 6),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.nombreCompleto,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (p.comunidad != null && p.comunidad!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            p.comunidad!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.textMuted, size: 20),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${p.totalVisitas} visita${p.totalVisitas == 1 ? '' : 's'} en total · '
+                'última vez: ${_formatDate(p.ultimaVisita)}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              if (semana >= 3 || semana > 1) ...[
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
-                  runSpacing: 6,
-                  children: symptoms
-                      .map((s) => _SymptomChip(label: s))
-                      .toList(),
+                  runSpacing: 4,
+                  children: [
+                    if (semana >= 3)
+                      _Badge(
+                        label: '⚠ Revisión frecuente',
+                        bg: const Color(0xFFFFE4E4),
+                        fg: const Color(0xFFDC2626),
+                      ),
+                    if (semana > 1)
+                      _Badge(
+                        label: '$semana visitas esta semana',
+                        bg: const Color(0xFFFEF3C7),
+                        fg: const Color(0xFFD97706),
+                      ),
+                  ],
                 ),
               ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildInfoField(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textMuted,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w500,
-            height: 1.3,
-          ),
-        ),
-      ],
     );
   }
 
@@ -376,86 +380,45 @@ class _CasosPageState extends State<CasosPage> {
       ],
     );
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  static String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  static String _formatDate(DateTime dt) {
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
+  }
 }
 
-// ── Status enum ───────────────────────────────────────────────────────────────
+// ── Badge ─────────────────────────────────────────────────────────────────────
 
-enum _CaseStatus { confirmed, suspicious, monitoring }
-
-// ── Status badge ──────────────────────────────────────────────────────────────
-
-class _StatusBadge extends StatelessWidget {
-  final _CaseStatus status;
-  const _StatusBadge({required this.status});
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color fg;
+  const _Badge({required this.label, required this.bg, required this.fg});
 
   @override
   Widget build(BuildContext context) {
-    final (icon, label, bg, fg) = switch (status) {
-      _CaseStatus.confirmed => (
-          Icons.circle,
-          'Confirmado',
-          const Color(0xFFFFE4E4),
-          const Color(0xFFDC2626),
-        ),
-      _CaseStatus.suspicious => (
-          Icons.warning_amber_rounded,
-          'Sospechoso',
-          const Color(0xFFFEF3C7),
-          const Color(0xFFD97706),
-        ),
-      _CaseStatus.monitoring => (
-          Icons.trending_up_rounded,
-          'En Seguimiento',
-          const Color(0xFFDCFCE7),
-          const Color(0xFF059669),
-        ),
-    };
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: fg, size: 11),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: fg,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Symptom chip ──────────────────────────────────────────────────────────────
-
-class _SymptomChip extends StatelessWidget {
-  final String label;
-  const _SymptomChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(20),
-      ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
+          color: fg,
           fontSize: 11,
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

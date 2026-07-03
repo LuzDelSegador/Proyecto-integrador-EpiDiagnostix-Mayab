@@ -85,18 +85,37 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     super.dispose();
   }
 
-  // ── Paso 3: guardar en SQLite antes del snackbar ──────────────────────────
+  // ── Paso 3: buscar/crear paciente y guardar consulta en SQLite ───────────
 
   Future<void> _saveAndSync() async {
+    final nombre   = _nameController.text.trim();
+    final localidad = _locationController.text.trim();
+
+    if (nombre.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Ingrese el nombre del paciente'),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    final sexo = widget.clinicalFields['sexo'] as String?;
     bool saved = false;
     try {
-      await sl<PatientLocalRepository>().save(
+      final repo     = sl<PatientLocalRepository>();
+      final paciente = await repo.buscarOCrearPaciente(nombre, sexo, localidad);
+      await repo.guardarConsulta(
+        paciente.id,
         PatientRecord(
-          nombrePaciente: _nameController.text.trim(),
-          localidad: _locationController.text.trim(),
-          textoOriginal: widget.originalText,
+          textoOriginal:   widget.originalText,
           camposExtraidos: widget.clinicalFields,
-          fechaCaptura: DateTime.now(),
+          fechaCaptura:    DateTime.now(),
         ),
       );
       saved = true;
@@ -141,7 +160,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Registro guardado con éxito',
+                'Consulta guardada',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
