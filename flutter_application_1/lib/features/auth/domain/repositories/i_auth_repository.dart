@@ -5,4 +5,10 @@ abstract class IAuthRepository {
     required String identifier,
     required String password,
   });
+
+  Future<AuthEntity> register({
+    required String nombreCompleto,
+    required String correo,
+    required String contrasena,
+  });
 }

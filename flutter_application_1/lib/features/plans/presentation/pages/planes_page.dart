@@ -3,13 +3,15 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/user_roles.dart';
+import '../../../../core/di/injection_container.dart' as di;
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/plan_service.dart';
+import 'cedula_solicitud_page.dart';
 
 // ── Constantes visuales ───────────────────────────────────────────────────────
 
 const _kColorIntermedioBadge = Color(0xFF059669);
 const _kColorPremiumBg       = Color(0xFF1A1A2E);
-const _kColorPremiumText     = Colors.white;
 const _kColorHipaa           = Color(0xFF7C3AED);
 
 class PlanesPage extends StatefulWidget {
@@ -22,9 +24,17 @@ class PlanesPage extends StatefulWidget {
 class _PlanesPageState extends State<PlanesPage> {
   bool _isProcessing = false;
 
-  // ── Flujo de pago ──────────────────────────────────────────────────────────
+  // Carga al abrir la página; null = sin solicitud, non-null = solicitud existente.
+  late final Future<SolicitudResult?> _solicitudFuture;
 
-  /// Paso 1: BottomSheet de confirmación antes de abrir Stripe.
+  @override
+  void initState() {
+    super.initState();
+    _solicitudFuture = di.sl<PlanService>().getMiSolicitud();
+  }
+
+  // ── Flujo Stripe ──────────────────────────────────────────────────────────
+
   void _showPaymentConfirmation(String planName, String precio, String correo) {
     showModalBottomSheet<void>(
       context: context,
@@ -44,7 +54,6 @@ class _PlanesPageState extends State<PlanesPage> {
     );
   }
 
-  /// Paso 2: Inicializa y presenta el PaymentSheet de Stripe.
   Future<void> _iniciarPago(String planName, String precio, String correo) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
@@ -53,7 +62,7 @@ class _PlanesPageState extends State<PlanesPage> {
       // TODO: Reemplazar clientSecret hardcodeado por llamada a
       // POST /payments/create-intent en el backend, que devuelve
       // { "client_secret": "pi_XXXX_secret_YYYY", "amount": XXXX, "currency": "mxn" }.
-      // Body esperado: { "price_id": kPriceIdIntermedio | kPriceIdPremium, "correo": correo }
+      // Body: { "price_id": kPriceIdIntermedio | kPriceIdPremium, "correo": correo }
       const clientSecret = 'pi_3test_secret_test';
 
       await Stripe.instance.initPaymentSheet(
@@ -65,24 +74,18 @@ class _PlanesPageState extends State<PlanesPage> {
             colors: PaymentSheetAppearanceColors(
               primary: Color(0xFF1B6E52),
             ),
-            shapes: PaymentSheetShape(
-              borderRadius: 10,
-            ),
+            shapes: PaymentSheetShape(borderRadius: 10),
           ),
         ),
       );
       await Stripe.instance.presentPaymentSheet();
-      // Si llega aquí (pago real exitoso en producción), activar plan.
     } on StripeException catch (e) {
-      // StripeException esperada: el clientSecret de prueba genera error controlado.
-      // En producción con clientSecret real, solo PaymentCanceled debe ignorarse.
       if (e.error.code == FailureCode.Canceled) {
         setState(() => _isProcessing = false);
         return;
       }
-      // Para cualquier otro error (incluido el de prueba), mostramos demo BottomSheet.
     } catch (_) {
-      // Error de red o clientSecret inválido → caemos al flujo demo.
+      // clientSecret inválido o red → flujo demo
     }
 
     if (!mounted) return;
@@ -90,7 +93,6 @@ class _PlanesPageState extends State<PlanesPage> {
     _showDemoSuccess(planName, correo);
   }
 
-  /// Paso 3: BottomSheet de confirmación de demo tras el intento de pago.
   void _showDemoSuccess(String planName, String correo) {
     showModalBottomSheet<void>(
       context: context,
@@ -99,6 +101,25 @@ class _PlanesPageState extends State<PlanesPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _DemoSuccessSheet(planName: planName, correo: correo),
+    );
+  }
+
+  // ── Flujo cédula ──────────────────────────────────────────────────────────
+
+  void _irACedulaSolicitud() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CedulaSolicitudPage()),
+    );
+  }
+
+  void _showEstadoSolicitud(SolicitudResult solicitud) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _EstadoSolicitudSheet(solicitud: solicitud),
     );
   }
 
@@ -131,7 +152,6 @@ class _PlanesPageState extends State<PlanesPage> {
                 ],
                 if (role != UserRole.medico) ...[
                   _IntermedioPlanCard(
-                    role: role,
                     isCurrentPlan: role == UserRole.enfermera,
                     onAdquirir: () => _showPaymentConfirmation(
                       'Intermedio', r'$49/mes', correo,
@@ -139,12 +159,23 @@ class _PlanesPageState extends State<PlanesPage> {
                   ),
                   const SizedBox(height: 14),
                 ],
-                _PremiumPlanCard(
-                  role: role,
-                  isCurrentPlan: role == UserRole.medico,
-                  onAdquirir: () => _showPaymentConfirmation(
-                    'Premium', r'$129/mes', correo,
-                  ),
+
+                // Premium: envuelto en FutureBuilder para el indicador de solicitud
+                FutureBuilder<SolicitudResult?>(
+                  future: _solicitudFuture,
+                  builder: (_, snap) {
+                    final pendiente = snap.connectionState == ConnectionState.done &&
+                        !snap.hasError &&
+                        snap.data?.estado == 'pendiente';
+                    return _PremiumPlanCard(
+                      isCurrentPlan: role == UserRole.medico,
+                      solicitudPendiente: pendiente,
+                      onAdquirir: () => _irACedulaSolicitud(),
+                      onVerEstado: pendiente && snap.data != null
+                          ? () => _showEstadoSolicitud(snap.data!)
+                          : null,
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 28),
@@ -261,23 +292,17 @@ class _PlanesPageState extends State<PlanesPage> {
   Widget _statItem(String value, String label) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 10),
-        ),
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(color: Colors.white70, fontSize: 10)),
       ],
     );
   }
 
-  Widget _divider() => Container(width: 1, height: 32, color: Colors.white24);
+  Widget _divider() =>
+      Container(width: 1, height: 32, color: Colors.white24);
 
   Widget _buildHipaaBadge() {
     return Container(
@@ -304,8 +329,9 @@ class _PlanesPageState extends State<PlanesPage> {
                   ),
                 ),
                 const Text(
-                  'Todos los datos de pacientes están cifrados en tránsito y en reposo conforme a NOM-024-SSA3.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.4),
+                  'Datos cifrados en tránsito y en reposo conforme a NOM-024-SSA3.',
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.textSecondary, height: 1.4),
                 ),
               ],
             ),
@@ -322,23 +348,22 @@ class _PlanesPageState extends State<PlanesPage> {
         const Text(
           'Preguntas frecuentes',
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary),
         ),
         const SizedBox(height: 10),
         _faqTile(
           '¿Los pagos son seguros?',
-          'Sí. Los pagos son procesados por Stripe, el estándar de la industria (PCI DSS Nivel 1). Nunca almacenamos datos de tu tarjeta en nuestros servidores.',
+          'Sí. Los pagos son procesados por Stripe (PCI DSS Nivel 1). Nunca almacenamos datos de tu tarjeta en nuestros servidores.',
         ),
         _faqTile(
           '¿Puedo cancelar mi suscripción en cualquier momento?',
-          'Sí. Puedes cancelar desde el panel de tu cuenta. Tu plan seguirá activo hasta el final del período pagado y no se hará ningún cargo adicional.',
+          'Sí. Tu plan seguirá activo hasta el final del período pagado y no se hará ningún cargo adicional.',
         ),
         _faqTile(
           '¿El plan Premium requiere cédula profesional?',
-          'Para médicos, solicitamos la cédula profesional durante la activación para garantizar que el acceso al mapa epidemiológico lo usen profesionales certificados. El equipo te contactará por correo para verificarla.',
+          'Sí. Para garantizar que el mapa epidemiológico lo usen profesionales certificados, solicitamos tu cédula durante la activación. El equipo la verificará en menos de 48 horas hábiles.',
         ),
       ],
     );
@@ -366,19 +391,15 @@ class _PlanesPageState extends State<PlanesPage> {
         title: Text(
           question,
           style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary),
         ),
         children: [
           Text(
             answer,
             style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              height: 1.55,
-            ),
+                fontSize: 12, color: AppColors.textSecondary, height: 1.55),
           ),
         ],
       ),
@@ -393,18 +414,15 @@ class _PlanesPageState extends State<PlanesPage> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.lock_rounded, color: AppColors.textSecondary, size: 18),
-          const SizedBox(width: 10),
-          const Expanded(
+          Icon(Icons.lock_rounded, color: AppColors.textSecondary, size: 18),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
               'Pagos procesados de forma segura por Stripe. Tus datos bancarios nunca se almacenan en nuestros servidores.',
               style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
+                  fontSize: 11, color: AppColors.textSecondary, height: 1.5),
             ),
           ),
         ],
@@ -440,12 +458,10 @@ class _FreePlanCard extends StatelessWidget {
 }
 
 class _IntermedioPlanCard extends StatelessWidget {
-  final UserRole role;
   final bool isCurrentPlan;
   final VoidCallback onAdquirir;
 
   const _IntermedioPlanCard({
-    required this.role,
     required this.isCurrentPlan,
     required this.onAdquirir,
   });
@@ -466,9 +482,7 @@ class _IntermedioPlanCard extends StatelessWidget {
         'Detección de anomalías ML',
         'Historial de consultas completo',
       ],
-      locked: const [
-        'Mapa epidemiológico interactivo',
-      ],
+      locked: const ['Mapa epidemiológico interactivo'],
       cta: isCurrentPlan
           ? const _CtaDisabled(label: '✓ Tu plan actual')
           : _CtaEnabled(
@@ -481,18 +495,76 @@ class _IntermedioPlanCard extends StatelessWidget {
 }
 
 class _PremiumPlanCard extends StatelessWidget {
-  final UserRole role;
   final bool isCurrentPlan;
+  final bool solicitudPendiente;
   final VoidCallback onAdquirir;
+  final VoidCallback? onVerEstado;
 
   const _PremiumPlanCard({
-    required this.role,
     required this.isCurrentPlan,
+    required this.solicitudPendiente,
     required this.onAdquirir,
+    this.onVerEstado,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget cta;
+    Widget? footer;
+
+    if (isCurrentPlan) {
+      cta = const _CtaDisabled(label: '✓ Tu plan actual', dark: true);
+    } else if (solicitudPendiente) {
+      cta = SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: OutlinedButton(
+          onPressed: onVerEstado,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white54),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text(
+            'Ver estado de mi solicitud',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+      footer = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: const Row(
+          children: [
+            Text('⏳', style: TextStyle(fontSize: 14)),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Solicitud en revisión · Menos de 48 horas',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF92400E),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      cta = _CtaEnabled(
+        label: r'Adquirir por $129/mes',
+        color: Colors.white,
+        textColor: _kColorPremiumBg,
+        onTap: onAdquirir,
+      );
+    }
+
     return _BasePlanCard(
       darkTheme: true,
       name: 'Premium',
@@ -508,14 +580,8 @@ class _PremiumPlanCard extends StatelessWidget {
         'Soporte prioritario 24 h',
       ],
       locked: const [],
-      cta: isCurrentPlan
-          ? const _CtaDisabled(label: '✓ Tu plan actual', dark: true)
-          : _CtaEnabled(
-              label: r'Adquirir por $129/mes',
-              color: Colors.white,
-              textColor: _kColorPremiumBg,
-              onTap: onAdquirir,
-            ),
+      cta: cta,
+      footer: footer,
     );
   }
 }
@@ -532,6 +598,7 @@ class _BasePlanCard extends StatelessWidget {
   final List<String> features;
   final List<String> locked;
   final Widget cta;
+  final Widget? footer;
   final bool highlighted;
   final bool darkTheme;
 
@@ -545,17 +612,18 @@ class _BasePlanCard extends StatelessWidget {
     required this.features,
     required this.locked,
     required this.cta,
+    this.footer,
     this.highlighted = false,
     this.darkTheme = false,
   });
 
-  Color get _bg => darkTheme ? _kColorPremiumBg : Colors.white;
-  Color get _nameColor => darkTheme ? _kColorPremiumText : AppColors.textPrimary;
-  Color get _subColor => darkTheme ? Colors.white60 : AppColors.textMuted;
-  Color get _priceColor => darkTheme ? _kColorPremiumText : AppColors.textPrimary;
+  Color get _bg          => darkTheme ? _kColorPremiumBg : Colors.white;
+  Color get _nameColor   => darkTheme ? Colors.white : AppColors.textPrimary;
+  Color get _subColor    => darkTheme ? Colors.white60 : AppColors.textMuted;
+  Color get _priceColor  => darkTheme ? Colors.white : AppColors.textPrimary;
   Color get _featureColor => darkTheme ? Colors.white70 : AppColors.textPrimary;
-  Color get _lockedColor => darkTheme ? Colors.white30 : AppColors.textMuted;
-  Color get _checkColor => darkTheme ? const Color(0xFF6EE7B7) : AppColors.success;
+  Color get _lockedColor  => darkTheme ? Colors.white30 : AppColors.textMuted;
+  Color get _checkColor   => darkTheme ? const Color(0xFF6EE7B7) : AppColors.success;
 
   @override
   Widget build(BuildContext context) {
@@ -586,36 +654,33 @@ class _BasePlanCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _nameColor,
-                        ),
-                      ),
+                      Text(name,
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: _nameColor)),
                       if (subtitle != null)
-                        Text(
-                          subtitle!,
-                          style: TextStyle(fontSize: 12, color: _subColor),
-                        ),
+                        Text(subtitle!,
+                            style:
+                                TextStyle(fontSize: 12, color: _subColor)),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: badgeColor.withValues(alpha: darkTheme ? 0.25 : 0.12),
+                    color: badgeColor.withValues(
+                        alpha: darkTheme ? 0.25 : 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     badgeLabel,
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: badgeColor,
-                      letterSpacing: 0.5,
-                    ),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: badgeColor,
+                        letterSpacing: 0.5),
                   ),
                 ),
               ],
@@ -626,56 +691,50 @@ class _BasePlanCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  priceLabel,
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: _priceColor,
-                  ),
-                ),
+                Text(priceLabel,
+                    style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: _priceColor)),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4, left: 2),
-                  child: Text(
-                    priceSuffix,
-                    style: TextStyle(fontSize: 14, color: _subColor),
-                  ),
+                  child: Text(priceSuffix,
+                      style: TextStyle(fontSize: 14, color: _subColor)),
                 ),
                 if (priceLabel != r'$0') ...[
                   const Spacer(),
-                  Text(
-                    'MXN',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _subColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  Text('MXN',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: _subColor,
+                          fontWeight: FontWeight.w500)),
                 ],
               ],
             ),
             const SizedBox(height: 16),
 
-            // Features
-            ...features.map(
-              (f) => _FeatureLine(
-                text: f,
-                color: _featureColor,
-                iconColor: _checkColor,
-                icon: Icons.check_circle_rounded,
-              ),
-            ),
-            ...locked.map(
-              (f) => _FeatureLine(
-                text: f,
-                color: _lockedColor,
-                iconColor: _lockedColor,
-                icon: Icons.lock_outline_rounded,
-              ),
-            ),
+            // Features + locked
+            ...features.map((f) => _FeatureLine(
+                  text: f,
+                  color: _featureColor,
+                  iconColor: _checkColor,
+                  icon: Icons.check_circle_rounded,
+                )),
+            ...locked.map((f) => _FeatureLine(
+                  text: f,
+                  color: _lockedColor,
+                  iconColor: _lockedColor,
+                  icon: Icons.lock_outline_rounded,
+                )),
 
             const SizedBox(height: 18),
             cta,
+
+            // Footer opcional (ej. indicador de solicitud pendiente)
+            if (footer != null) ...[
+              const SizedBox(height: 10),
+              footer!,
+            ],
           ],
         ),
       ),
@@ -688,13 +747,11 @@ class _FeatureLine extends StatelessWidget {
   final Color color;
   final Color iconColor;
   final IconData icon;
-
-  const _FeatureLine({
-    required this.text,
-    required this.color,
-    required this.iconColor,
-    required this.icon,
-  });
+  const _FeatureLine(
+      {required this.text,
+      required this.color,
+      required this.iconColor,
+      required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -705,8 +762,8 @@ class _FeatureLine extends StatelessWidget {
           Icon(icon, size: 16, color: iconColor),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: TextStyle(fontSize: 13, color: color)),
-          ),
+              child: Text(text,
+                  style: TextStyle(fontSize: 13, color: color))),
         ],
       ),
     );
@@ -731,14 +788,15 @@ class _CtaDisabled extends StatelessWidget {
           disabledBackgroundColor: dark
               ? Colors.white.withValues(alpha: 0.1)
               : const Color(0xFFF3F4F6),
-          disabledForegroundColor: dark ? Colors.white38 : AppColors.textMuted,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          disabledForegroundColor:
+              dark ? Colors.white38 : AppColors.textMuted,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
           elevation: 0,
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
+        child: Text(label,
+            style:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -749,13 +807,11 @@ class _CtaEnabled extends StatelessWidget {
   final Color color;
   final Color? textColor;
   final VoidCallback onTap;
-
-  const _CtaEnabled({
-    required this.label,
-    required this.color,
-    this.textColor,
-    required this.onTap,
-  });
+  const _CtaEnabled(
+      {required this.label,
+      required this.color,
+      this.textColor,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -768,12 +824,12 @@ class _CtaEnabled extends StatelessWidget {
           backgroundColor: color,
           foregroundColor: textColor ?? Colors.white,
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
         ),
-        child: Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
+        child: Text(label,
+            style:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -800,44 +856,37 @@ class _PaymentConfirmationSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle bar
           Center(
             child: Container(
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  color: const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 20),
-
-          // Título
           Text(
             'Confirmar plan $planName',
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary),
           ),
           const SizedBox(height: 4),
           Text(
             '$precio MXN — renovación mensual automática',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+                fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-
-          // Métodos de pago disponibles
           const Text(
-            'Métodos de pago disponibles',
+            'MÉTODOS DE PAGO',
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
-              letterSpacing: 0.5,
-            ),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+                letterSpacing: 0.5),
           ),
           const SizedBox(height: 10),
           Row(
@@ -850,8 +899,6 @@ class _PaymentConfirmationSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-
-          // Nota de seguridad
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -866,15 +913,14 @@ class _PaymentConfirmationSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Pago seguro con cifrado SSL. Procesado por Stripe.',
-                    style: TextStyle(fontSize: 11, color: AppColors.info, height: 1.4),
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.info, height: 1.4),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 22),
-
-          // Botón continuar
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -885,23 +931,20 @@ class _PaymentConfirmationSheet extends StatelessWidget {
                 foregroundColor: Colors.white,
                 elevation: 2,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'Continuar al pago',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
+              child: const Text('Continuar al pago',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(height: 12),
           Center(
             child: TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancelar',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-              ),
+              child: const Text('Cancelar',
+                  style: TextStyle(
+                      color: AppColors.textMuted, fontSize: 13)),
             ),
           ),
         ],
@@ -929,21 +972,18 @@ class _PaymentMethodChip extends StatelessWidget {
         children: [
           Text(emoji, style: const TextStyle(fontSize: 14)),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary)),
         ],
       ),
     );
   }
 }
 
-// ── BottomSheet: Demo de éxito ────────────────────────────────────────────────
+// ── BottomSheet: Demo de éxito (Stripe) ──────────────────────────────────────
 
 class _DemoSuccessSheet extends StatelessWidget {
   final String planName;
@@ -957,18 +997,14 @@ class _DemoSuccessSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           Container(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5E7EB),
-              borderRadius: BorderRadius.circular(2),
-            ),
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(height: 24),
-
-          // Ícono
           Container(
             width: 64,
             height: 64,
@@ -976,31 +1012,21 @@ class _DemoSuccessSheet extends StatelessWidget {
               color: AppColors.success.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.check_circle_rounded,
-              color: AppColors.success,
-              size: 36,
-            ),
+            child: const Icon(Icons.check_circle_rounded,
+                color: AppColors.success, size: 36),
           ),
           const SizedBox(height: 18),
-
-          Text(
-            '✓ Pago procesado en modo demo',
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          const Text('✓ Pago procesado en modo demo',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary),
+              textAlign: TextAlign.center),
           const SizedBox(height: 10),
           Text(
             'Tu plan $planName se activará cuando el sistema esté en producción.',
             style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-              height: 1.5,
-            ),
+                fontSize: 13, color: AppColors.textSecondary, height: 1.5),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
@@ -1008,25 +1034,22 @@ class _DemoSuccessSheet extends StatelessWidget {
             textAlign: TextAlign.center,
             text: TextSpan(
               style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.5),
               children: [
                 const TextSpan(text: 'Te contactaremos a '),
                 TextSpan(
                   text: correo,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary),
                 ),
                 const TextSpan(text: ' para confirmar la activación.'),
               ],
             ),
           ),
           const SizedBox(height: 28),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -1036,13 +1059,100 @@ class _DemoSuccessSheet extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'Entendido',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              child: const Text('Entendido',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── BottomSheet: Estado de solicitud ─────────────────────────────────────────
+
+class _EstadoSolicitudSheet extends StatelessWidget {
+  final SolicitudResult solicitud;
+  const _EstadoSolicitudSheet({required this.solicitud});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEF3C7),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.hourglass_top_rounded,
+                color: Color(0xFFD97706), size: 32),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Solicitud en revisión',
+            style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Tu cédula profesional está siendo verificada.\nTe notificaremos en menos de 48 horas hábiles.',
+            style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          if (solicitud.solicitudId.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(6),
               ),
+              child: Text(
+                'ID: ${solicitud.solicitudId}',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                    fontFamily: 'monospace'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Entendido',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold)),
             ),
           ),
         ],

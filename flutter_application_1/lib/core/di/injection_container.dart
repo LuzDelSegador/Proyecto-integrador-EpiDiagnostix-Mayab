@@ -6,23 +6,27 @@ import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/i_auth_repository.dart';
 import '../../features/auth/domain/usecases/login_usecase.dart';
+import '../../features/auth/domain/usecases/register_usecase.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/patients/data/repositories/patient_local_repository.dart';
+import '../../features/plans/data/plan_service.dart';
 
 final sl = GetIt.instance;
 
 Future<void> init() async {
   // ── Presentation ──────────────────────────────────────────────
-  sl.registerFactory(() => AuthProvider(sl(), sl()));
+  sl.registerFactory(() => AuthProvider(sl(), sl(), sl()));
 
   // ── Use Cases ─────────────────────────────────────────────────
   sl.registerLazySingleton(() => LoginUseCase(sl()));
+  sl.registerLazySingleton(() => RegisterUseCase(sl()));
 
   // ── Repositories ──────────────────────────────────────────────
   sl.registerLazySingleton<IAuthRepository>(
     () => AuthRepositoryImpl(sl()),
   );
   sl.registerLazySingleton(() => PatientLocalRepository());
+  sl.registerLazySingleton(() => PlanService(sl()));
 
   // ── Data Sources ──────────────────────────────────────────────
   sl.registerLazySingleton<IAuthRemoteDataSource>(
