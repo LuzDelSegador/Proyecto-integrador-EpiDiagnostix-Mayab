@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../data/models/patient_record.dart';
 import '../../data/repositories/patient_local_repository.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../plans/presentation/pages/planes_page.dart';
 
 class AudioConfirmationPage extends StatefulWidget {
   final Map<String, dynamic> clinicalFields;
@@ -87,8 +91,11 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
   // ── Paso 3: buscar/crear paciente y guardar consulta en SQLite ───────────
 
+  static String _normSimple(String s) =>
+      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
   Future<void> _saveAndSync() async {
-    final nombre   = _nameController.text.trim();
+    final nombre    = _nameController.text.trim();
     final localidad = _locationController.text.trim();
 
     if (nombre.isEmpty) {
@@ -103,6 +110,23 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         ),
       );
       return;
+    }
+
+    // Verificar límite de 5 pacientes para rol usuario
+    if (!mounted) return;
+    final role = context.read<AuthProvider>().currentRole;
+    if (role == UserRole.usuario) {
+      final repo  = sl<PatientLocalRepository>();
+      final todos = await repo.getPacientes(null);
+      final normNuevo  = _normSimple(nombre);
+      final existeYa   = todos.any(
+        (r) => _normSimple(r.paciente.nombreCompleto) == normNuevo,
+      );
+      if (!existeYa && todos.length >= 5) {
+        if (!mounted) return;
+        _showLimitBottomSheet();
+        return;
+      }
     }
 
     final sexo = widget.clinicalFields['sexo'] as String?;
@@ -181,6 +205,86 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
+  }
+
+  void _showLimitBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Icon(
+              Icons.lock_outline_rounded,
+              size: 48,
+              color: Color(0xFFD97706),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Límite del plan Free alcanzado',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Has alcanzado el límite del plan Free (5 pacientes).\nActualiza tu plan para registros ilimitados.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PlanesPage()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Ver planes',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _toggleEdit() => setState(() => _isEditing = !_isEditing);

@@ -3,10 +3,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/user_roles.dart';
+import '../../../../core/widgets/upgrade_required_widget.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
+import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 
 class MapaPage extends StatefulWidget {
@@ -46,17 +49,32 @@ class _MapaPageState extends State<MapaPage> {
 
   @override
   Widget build(BuildContext context) {
+    final role = context.read<AuthProvider>().currentRole;
+    final bloqueado = !role.puedeVerMapa;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       appBar: _buildAppBar(),
-      body: Stack(
-        children: [
-          _buildMap(),
-          _buildFilterRow(),
-          _buildZoomControls(),
-          if (_selectedDistrict != null) _buildInfoPanel(_selectedDistrict!),
-        ],
-      ),
+      body: bloqueado
+          ? UpgradeRequiredWidget(
+              featureName: 'Mapa Epidemiológico',
+              requiredPlan: 'Premium (Doctor)',
+              description:
+                  'Visualiza focos de infección, zonas de riesgo y análisis '
+                  'espacial de brotes en tiempo real.',
+              onVerPlanes: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PlanesPage()),
+              ),
+            )
+          : Stack(
+              children: [
+                _buildMap(),
+                _buildFilterRow(),
+                _buildZoomControls(),
+                if (_selectedDistrict != null)
+                  _buildInfoPanel(_selectedDistrict!),
+              ],
+            ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }

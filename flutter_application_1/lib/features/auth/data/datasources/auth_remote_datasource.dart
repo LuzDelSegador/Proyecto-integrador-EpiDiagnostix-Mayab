@@ -7,6 +7,12 @@ abstract class IAuthRemoteDataSource {
     required String identifier,
     required String password,
   });
+
+  Future<AuthModel> register({
+    required String nombreCompleto,
+    required String correo,
+    required String contrasena,
+  });
 }
 
 class AuthRemoteDataSource implements IAuthRemoteDataSource {
@@ -38,6 +44,34 @@ class AuthRemoteDataSource implements IAuthRemoteDataSource {
       }
       final message = e.response?.data?['message'] as String?;
       throw ServerException(message ?? 'Error al conectar con el servidor.');
+    }
+  }
+
+  @override
+  Future<AuthModel> register({
+    required String nombreCompleto,
+    required String correo,
+    required String contrasena,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/auth/register',
+        data: {
+          'nombre_completo': nombreCompleto,
+          'correo':          correo,
+          'contrasena':      contrasena,
+        },
+      );
+      return AuthModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout) {
+        throw const NetworkException();
+      }
+      if (e.response?.statusCode == 409) throw const ConflictException();
+      if (e.response?.statusCode == 422) throw const ValidationException();
+      final message = e.response?.data?['message'] as String?;
+      throw ServerException(message ?? 'Error al crear la cuenta. Intenta de nuevo.');
     }
   }
 }

@@ -3,12 +3,15 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/services/tflite_extractor.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import 'audio_confirmation_page.dart';
 
 enum _RecordState { idle, recording, transcribing }
@@ -676,6 +679,9 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
   // ── Mic card ──────────────────────────────────────────────────────────────
 
   Widget _buildMicCard() {
+    final role = context.read<AuthProvider>().currentRole;
+    if (role == UserRole.usuario) return _buildMicCardLocked();
+
     final isRec = _recordState == _RecordState.recording;
     final isTranscribing = _recordState == _RecordState.transcribing;
 
@@ -770,6 +776,78 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
           Text(
             subtitleText,
             style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Mic card locked (rol usuario) ────────────────────────────────────────
+
+  Widget _buildMicCardLocked() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Tooltip(
+            message: 'Disponible en plan Intermedio',
+            child: GestureDetector(
+              onTap: () =>
+                  _showSnack('Disponible en plan Intermedio'),
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.textMuted.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Micrófono no disponible\nen tu plan actual',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+              height: 1.35,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Actualiza al plan Intermedio para grabar\ny transcribir audio con IA.',
+            style: TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
               height: 1.5,

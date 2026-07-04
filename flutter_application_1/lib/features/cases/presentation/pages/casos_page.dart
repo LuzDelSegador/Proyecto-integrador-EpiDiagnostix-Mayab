@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
@@ -9,7 +10,9 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/data/models/paciente.dart';
 import '../../../patients/data/repositories/patient_local_repository.dart';
+import '../../../patients/presentation/pages/new_patient_selection_page.dart';
 import '../../../patients/presentation/pages/paciente_detalle_page.dart';
+import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 
 class CasosPage extends StatefulWidget {
@@ -20,7 +23,7 @@ class CasosPage extends StatefulWidget {
 }
 
 class _CasosPageState extends State<CasosPage> {
-  int _currentNavIndex = 2;
+  int _currentNavIndex = 1; // Casos siempre es índice 1 en todas las variantes de tabs
   final _searchController = TextEditingController();
 
   List<PacienteConResumen> _pacientes = [];
@@ -319,29 +322,80 @@ class _CasosPageState extends State<CasosPage> {
 
   // ── Bottom Nav ────────────────────────────────────────────────────────────
 
+  /// Construye la lista de tabs según el rol del usuario.
+  /// Tab índice 1 ("Casos") siempre tiene navigate == null → página actual.
+  List<_TabItem> _buildTabs(UserRole role) {
+    final nav = Navigator.of(context);
+
+    final dashboard = _TabItem(
+      icon: Icons.dashboard_outlined,
+      activeIcon: Icons.dashboard,
+      label: 'Dashboard',
+      navigate: () => nav.popUntil((r) => r.isFirst),
+    );
+    final casos = _TabItem(
+      icon: Icons.folder_outlined,
+      activeIcon: Icons.folder,
+      label: 'Casos',
+      navigate: null, // página actual
+    );
+    final nuevo = _TabItem(
+      icon: Icons.person_add_outlined,
+      activeIcon: Icons.person_add,
+      label: 'Nuevo',
+      navigate: () => nav.push(
+        MaterialPageRoute(builder: (_) => const NewPatientSelectionPage()),
+      ),
+    );
+    final anomalias = _TabItem(
+      icon: Icons.warning_amber_outlined,
+      activeIcon: Icons.warning_amber_rounded,
+      label: 'Anomalías',
+      navigate: () => nav.pushReplacement(
+        MaterialPageRoute(builder: (_) => const AnomaliesPage()),
+      ),
+    );
+    final mapa = _TabItem(
+      icon: Icons.map_outlined,
+      activeIcon: Icons.map,
+      label: 'Mapa',
+      navigate: () => nav.push(
+        MaterialPageRoute(builder: (_) => const MapaPage()),
+      ),
+    );
+    final servicios = _TabItem(
+      icon: Icons.medical_services_outlined,
+      activeIcon: Icons.medical_services,
+      label: 'Servicios',
+      navigate: () => nav.push(
+        MaterialPageRoute(builder: (_) => const ServiciosPage()),
+      ),
+    );
+    final planes = _TabItem(
+      icon: Icons.star_outline_rounded,
+      activeIcon: Icons.star_rounded,
+      label: 'Planes',
+      navigate: () => nav.push(
+        MaterialPageRoute(builder: (_) => const PlanesPage()),
+      ),
+    );
+
+    return switch (role) {
+      UserRole.usuario   => [dashboard, casos, nuevo, servicios, planes],
+      UserRole.enfermera => [dashboard, casos, nuevo, anomalias, servicios, planes],
+      UserRole.medico    => [dashboard, casos, nuevo, anomalias, mapa, servicios],
+    };
+  }
+
   Widget _buildBottomNav() {
+    final role = context.read<AuthProvider>().currentRole;
+    final tabs = _buildTabs(role);
+
     return BottomNavigationBar(
       currentIndex: _currentNavIndex,
       onTap: (i) {
-        if (i == 0) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        } else if (i == 1) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AnomaliesPage()),
-          );
-        } else if (i == 2) {
-          // ya estamos aquí
-        } else if (i == 3) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MapaPage()),
-          );
-        } else if (i == 4) {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServiciosPage()),
-          );
-        } else {
-          setState(() => _currentNavIndex = i);
-        }
+        setState(() => _currentNavIndex = i); // resalta el tab tocado
+        tabs[i].navigate?.call();             // navega si no es la página actual
       },
       selectedItemColor: AppColors.primary,
       unselectedItemColor: AppColors.textMuted,
@@ -351,33 +405,13 @@ class _CasosPageState extends State<CasosPage> {
           const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
       unselectedLabelStyle: const TextStyle(fontSize: 10),
       elevation: 10,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard_outlined),
-          activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.warning_amber_outlined),
-          activeIcon: Icon(Icons.warning_amber_rounded),
-          label: 'Anomalías',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.folder_outlined),
-          activeIcon: Icon(Icons.folder),
-          label: 'Casos',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.map_outlined),
-          activeIcon: Icon(Icons.map),
-          label: 'Mapa',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.medical_services_outlined),
-          activeIcon: Icon(Icons.medical_services),
-          label: 'Servicios',
-        ),
-      ],
+      items: tabs
+          .map((t) => BottomNavigationBarItem(
+                icon: Icon(t.icon),
+                activeIcon: Icon(t.activeIcon),
+                label: t.label,
+              ))
+          .toList(),
     );
   }
 
@@ -395,6 +429,22 @@ class _CasosPageState extends State<CasosPage> {
     final m = dt.month.toString().padLeft(2, '0');
     return '$d/$m/${dt.year}';
   }
+}
+
+// ── TabItem ───────────────────────────────────────────────────────────────────
+
+class _TabItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final VoidCallback? navigate;
+
+  const _TabItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.navigate,
+  });
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────

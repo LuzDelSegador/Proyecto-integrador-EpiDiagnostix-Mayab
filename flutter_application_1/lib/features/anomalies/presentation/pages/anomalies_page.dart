@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/user_roles.dart';
+import '../../../../core/widgets/upgrade_required_widget.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/presentation/pages/new_patient_selection_page.dart';
+import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
-import 'package:provider/provider.dart';
 
 class AnomaliesPage extends StatefulWidget {
   const AnomaliesPage({super.key});
@@ -20,6 +23,9 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final role = context.read<AuthProvider>().currentRole;
+    final bloqueado = role == UserRole.usuario;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       appBar: _buildAppBar(),
@@ -27,84 +33,97 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
         children: [
           _buildSyncBanner(),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPageHeader(),
-                  const SizedBox(height: 16),
-                  _buildStatsRow(),
-                  const SizedBox(height: 12),
-                  _buildConfidenceCard(),
-                  const SizedBox(height: 20),
-                  _buildDetectionsHeader(),
-                  const SizedBox(height: 12),
-                  _buildDetectionCard(
-                    icon: Icons.coronavirus_outlined,
-                    iconBg: const Color(0xFFFFE4E4),
-                    iconColor: const Color(0xFFDC2626),
-                    disease: 'Cólera (Sospecha)',
-                    badge: 'crítico',
-                    badgeColor: const Color(0xFFDC2626),
-                    location: 'Aldea San Marcos, Sector 4',
-                    cases: '8 casos nuevos',
-                    time: 'Hace 45 min',
-                    confidence: 98,
-                    actionLabel: 'Reportar a Central',
-                    actionBg: const Color(0xFFDC2626),
-                    actionFg: Colors.white,
+            child: bloqueado
+                ? UpgradeRequiredWidget(
+                    featureName: 'Anomalías ML',
+                    requiredPlan: 'Intermedio (Enfermera)',
+                    description:
+                        'El motor de IA detecta brotes y anomalías epidemiológicas en tiempo real. Disponible desde el plan Intermedio.',
+                    onVerPlanes: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PlanesPage()),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPageHeader(),
+                        const SizedBox(height: 16),
+                        _buildStatsRow(),
+                        const SizedBox(height: 12),
+                        _buildConfidenceCard(),
+                        const SizedBox(height: 20),
+                        _buildDetectionsHeader(),
+                        const SizedBox(height: 12),
+                        _buildDetectionCard(
+                          icon: Icons.coronavirus_outlined,
+                          iconBg: const Color(0xFFFFE4E4),
+                          iconColor: const Color(0xFFDC2626),
+                          disease: 'Cólera (Sospecha)',
+                          badge: 'crítico',
+                          badgeColor: const Color(0xFFDC2626),
+                          location: 'Aldea San Marcos, Sector 4',
+                          cases: '8 casos nuevos',
+                          time: 'Hace 45 min',
+                          confidence: 98,
+                          actionLabel: 'Reportar a Central',
+                          actionBg: const Color(0xFFDC2626),
+                          actionFg: Colors.white,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDetectionCard(
+                          icon: Icons.wb_sunny_outlined,
+                          iconBg: const Color(0xFFFEF3C7),
+                          iconColor: const Color(0xFFD97706),
+                          disease: 'Influenza Estacional',
+                          badge: 'ADVERTENCIA',
+                          badgeColor: const Color(0xFFD97706),
+                          location: 'Centro Urbano - Zona 1',
+                          cases: '24 casos acumulados',
+                          time: 'Hace 3 horas',
+                          confidence: 87,
+                          actionLabel: 'Investigar',
+                          actionBg: AppColors.primary,
+                          actionFg: Colors.white,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDetectionCard(
+                          icon: Icons.biotech_outlined,
+                          iconBg: const Color(0xFFEDE9FE),
+                          iconColor: const Color(0xFF7C3AED),
+                          disease: 'Agente Desconocido',
+                          badge: 'RESERVACIÓN',
+                          badgeColor: const Color(0xFF1E3A5F),
+                          location: 'Periferia Norte',
+                          cases: '3 síntomas atípicos',
+                          time: 'Hace 6 horas',
+                          confidence: 67,
+                          actionLabel: 'Seguir Casos',
+                          actionBg: Colors.transparent,
+                          actionFg: AppColors.textSecondary,
+                          actionBorder: const Color(0xFFD1D5DB),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildSpatialAnalysis(),
+                        const SizedBox(height: 90),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildDetectionCard(
-                    icon: Icons.wb_sunny_outlined,
-                    iconBg: const Color(0xFFFEF3C7),
-                    iconColor: const Color(0xFFD97706),
-                    disease: 'Influenza Estacional',
-                    badge: 'ADVERTENCIA',
-                    badgeColor: const Color(0xFFD97706),
-                    location: 'Centro Urbano - Zona 1',
-                    cases: '24 casos acumulados',
-                    time: 'Hace 3 horas',
-                    confidence: 87,
-                    actionLabel: 'Investigar',
-                    actionBg: AppColors.primary,
-                    actionFg: Colors.white,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetectionCard(
-                    icon: Icons.biotech_outlined,
-                    iconBg: const Color(0xFFEDE9FE),
-                    iconColor: const Color(0xFF7C3AED),
-                    disease: 'Agente Desconocido',
-                    badge: 'RESERVACIÓN',
-                    badgeColor: const Color(0xFF1E3A5F),
-                    location: 'Periferia Norte',
-                    cases: '3 síntomas atípicos',
-                    time: 'Hace 6 horas',
-                    confidence: 67,
-                    actionLabel: 'Seguir Casos',
-                    actionBg: Colors.transparent,
-                    actionFg: AppColors.textSecondary,
-                    actionBorder: const Color(0xFFD1D5DB),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSpatialAnalysis(),
-                  const SizedBox(height: 90),
-                ],
-              ),
-            ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NewPatientSelectionPage()),
-        ),
-        backgroundColor: AppColors.primary,
-        elevation: 4,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
-      ),
+      floatingActionButton: bloqueado
+          ? null
+          : FloatingActionButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const NewPatientSelectionPage()),
+              ),
+              backgroundColor: AppColors.primary,
+              elevation: 4,
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }

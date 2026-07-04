@@ -16,4 +16,16 @@ class AuthRepositoryImpl implements IAuthRepository {
         identifier: identifier,
         password:   password,
       );
+
+  @override
+  Future<AuthEntity> register({
+    required String nombreCompleto,
+    required String correo,
+    required String contrasena,
+  }) =>
+      _remoteDataSource.register(
+        nombreCompleto: nombreCompleto,
+        correo:         correo,
+        contrasena:     contrasena,
+      );
 }

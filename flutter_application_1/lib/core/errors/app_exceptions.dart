@@ -19,3 +19,17 @@ class UnauthorizedException implements Exception {
   @override
   String toString() => 'Credenciales incorrectas. Verifique su identificación y contraseña.';
 }
+
+class ConflictException implements Exception {
+  const ConflictException();
+
+  @override
+  String toString() => 'Este correo ya está registrado. Intenta con otro.';
+}
+
+class ValidationException implements Exception {
+  const ValidationException();
+
+  @override
+  String toString() => 'Datos inválidos. Verifica los campos.';
+}
