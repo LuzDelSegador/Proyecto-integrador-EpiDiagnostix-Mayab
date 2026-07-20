@@ -10,7 +10,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/data/models/paciente.dart';
 import '../../../patients/data/repositories/patient_local_repository.dart';
-import '../../../patients/presentation/pages/new_patient_selection_page.dart';
+import '../../../patients/presentation/pages/patient_registration_page.dart';
 import '../../../patients/presentation/pages/paciente_detalle_page.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
@@ -344,7 +344,7 @@ class _CasosPageState extends State<CasosPage> {
       activeIcon: Icons.person_add,
       label: 'Nuevo',
       navigate: () => nav.push(
-        MaterialPageRoute(builder: (_) => const NewPatientSelectionPage()),
+        MaterialPageRoute(builder: (_) => const PatientRegistrationPage()),
       ),
     );
     final anomalias = _TabItem(

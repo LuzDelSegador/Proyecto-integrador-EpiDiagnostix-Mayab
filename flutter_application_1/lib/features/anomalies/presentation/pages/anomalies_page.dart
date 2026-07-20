@@ -10,7 +10,7 @@ import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
-import '../../../patients/presentation/pages/new_patient_selection_page.dart';
+import '../../../patients/presentation/pages/patient_registration_page.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 import '../../data/anomaly_service.dart';
@@ -285,7 +285,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           : FloatingActionButton(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(
-                    builder: (_) => const NewPatientSelectionPage()),
+                    builder: (_) => const PatientRegistrationPage()),
               ),
               backgroundColor: AppColors.primary,
               elevation: 4,

@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import 'audio_confirmation_page.dart';
 import 'audio_transcription_page.dart';
-import 'patient_registration_page.dart';
 
+/// Punto de entrada tras identificar/crear al paciente (ver
+/// PatientRegistrationPage): ofrece cómo capturar la consulta para ESE
+/// paciente ya conocido (pacienteId es el id local en SQLite).
 class NewPatientSelectionPage extends StatelessWidget {
-  const NewPatientSelectionPage({super.key});
+  final String pacienteId;
+  final String pacienteNombre;
+
+  const NewPatientSelectionPage({
+    super.key,
+    required this.pacienteId,
+    required this.pacienteNombre,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +72,15 @@ class NewPatientSelectionPage extends StatelessWidget {
             child: const Icon(Icons.close, color: AppColors.textPrimary, size: 22),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Nuevo Paciente',
-              style: TextStyle(
+              pacienteNombre,
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const Icon(
@@ -98,7 +109,7 @@ class NewPatientSelectionPage extends StatelessWidget {
         ),
         SizedBox(height: 8),
         Text(
-          'Seleccione cómo desea capturar los datos epidemiológicos del nuevo paciente para el Distrito 7.',
+          'Seleccione cómo desea capturar los datos epidemiológicos de esta consulta.',
           style: TextStyle(
             fontSize: 13,
             color: AppColors.textSecondary,
@@ -122,7 +133,14 @@ class NewPatientSelectionPage extends StatelessWidget {
       linkLabel: 'Empezar ahora',
       linkTrailing: const Icon(Icons.arrow_forward, size: 16, color: AppColors.primary),
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PatientRegistrationPage()),
+        MaterialPageRoute(
+          builder: (_) => AudioConfirmationPage(
+            pacienteId: pacienteId,
+            pacienteNombre: pacienteNombre,
+            clinicalFields: const {},
+            originalText: '',
+          ),
+        ),
       ),
     );
   }
@@ -139,7 +157,12 @@ class NewPatientSelectionPage extends StatelessWidget {
       linkLabel: 'Iniciar grabación',
       linkTrailing: const Icon(Icons.graphic_eq, size: 18, color: AppColors.primary),
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AudioTranscriptionPage()),
+        MaterialPageRoute(
+          builder: (_) => AudioTranscriptionPage(
+            pacienteId: pacienteId,
+            pacienteNombre: pacienteNombre,
+          ),
+        ),
       ),
     );
   }

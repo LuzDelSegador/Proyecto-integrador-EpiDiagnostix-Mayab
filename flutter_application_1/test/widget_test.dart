@@ -10,7 +10,7 @@ void main() {
   });
 
   testWidgets('App launches and shows login screen', (WidgetTester tester) async {
-    await tester.pumpWidget(const EpiSurveillanceApp());
+    await tester.pumpWidget(const EpiSurveillanceApp(startWithDashboard: false));
     await tester.pumpAndSettle();
 
     expect(find.byType(MaterialApp), findsOneWidget);

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import 'register_page.dart';
@@ -85,26 +84,10 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(12),
-          child: SvgPicture.asset(
-            'assets/images/health_logo.svg',
-            width: 48,
-            height: 48,
-          ),
+        Image.asset(
+          'assets/images/app_icon_mark.png',
+          width: 96,
+          height: 96,
         ),
         const SizedBox(height: 14),
         const Text(

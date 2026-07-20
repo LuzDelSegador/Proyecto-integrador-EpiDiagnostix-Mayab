@@ -134,25 +134,10 @@ class _RegisterPageState extends State<RegisterPage> {
   // ── Logo ──────────────────────────────────────────────────────────────────
 
   Widget _buildLogo() {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: const Icon(
-        Icons.medical_services_rounded,
-        color: Colors.white,
-        size: 36,
-      ),
+    return Image.asset(
+      'assets/images/app_icon_mark.png',
+      width: 96,
+      height: 96,
     );
   }
 

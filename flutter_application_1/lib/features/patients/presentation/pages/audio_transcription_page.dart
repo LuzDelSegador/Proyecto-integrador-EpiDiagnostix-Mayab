@@ -17,7 +17,14 @@ import 'audio_confirmation_page.dart';
 enum _RecordState { idle, recording, transcribing }
 
 class AudioTranscriptionPage extends StatefulWidget {
-  const AudioTranscriptionPage({super.key});
+  final String pacienteId;
+  final String pacienteNombre;
+
+  const AudioTranscriptionPage({
+    super.key,
+    required this.pacienteId,
+    required this.pacienteNombre,
+  });
 
   @override
   State<AudioTranscriptionPage> createState() => _AudioTranscriptionPageState();
@@ -218,6 +225,8 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => AudioConfirmationPage(
+            pacienteId: widget.pacienteId,
+            pacienteNombre: widget.pacienteNombre,
             originalText: text,
             clinicalFields: fields,
           ),

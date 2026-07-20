@@ -7,8 +7,10 @@ class DioClient {
   DioClient(TokenStorage tokenStorage) {
     dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        // Render free tier duerme el servicio tras inactividad: el primer
+        // request tras un cold-start puede tardar ~20-30s en responder.
+        connectTimeout: const Duration(seconds: 40),
+        receiveTimeout: const Duration(seconds: 40),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

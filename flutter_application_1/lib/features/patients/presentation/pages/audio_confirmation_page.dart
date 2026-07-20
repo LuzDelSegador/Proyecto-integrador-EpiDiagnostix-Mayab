@@ -2,24 +2,27 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_config.dart';
-import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/services/token_storage.dart';
 import '../../data/models/patient_record.dart';
 import '../../data/repositories/patient_local_repository.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../plans/presentation/pages/planes_page.dart';
+import '../../../attentions/data/models/medicamento.dart';
+import '../../../sync/data/sync_service.dart';
 
 enum _GpsStatus { loading, ready, unavailable }
 
 class AudioConfirmationPage extends StatefulWidget {
+  final String pacienteId;
+  final String pacienteNombre;
   final Map<String, dynamic> clinicalFields;
   final String originalText;
 
   const AudioConfirmationPage({
     super.key,
+    required this.pacienteId,
+    required this.pacienteNombre,
     required this.clinicalFields,
     required this.originalText,
   });
@@ -36,11 +39,13 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   double? _longitud;
   _GpsStatus _gpsStatus = _GpsStatus.loading;
 
-  // ── Perfil del paciente ────────────────────────────────────────────────────
-  late final TextEditingController _nameController;
+  // ── Perfil del paciente (identidad ya existe, solo lectura/edad-género) ────
   late final TextEditingController _ageController;
   late final TextEditingController _genderController;
-  late final TextEditingController _locationController;
+
+  // ── Ubicación/comunidad de ESTA consulta (requerido por MS2) ──────────────
+  late final TextEditingController _comunidadController;
+  late final TextEditingController _municipioController;
 
   // ── Datos clínicos vitales ─────────────────────────────────────────────────
   late final TextEditingController _categoryController;
@@ -52,6 +57,12 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   late final TextEditingController _tempController;
   late final TextEditingController _heartRateController;
   late final TextEditingController _durationController;
+  late final TextEditingController _saturacionController;
+
+  // ── Datos manuales nuevos (no los extrae el BiLSTM) ────────────────────────
+  late final TextEditingController _motivoController;
+  late final TextEditingController _diagnosticoController;
+  final List<Medicamento> _medicamentos = [];
 
   bool _detected(String key) => widget.clinicalFields.containsKey(key);
 
@@ -60,7 +71,6 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     super.initState();
     final f = widget.clinicalFields;
 
-    _nameController     = TextEditingController(text: '');
     _ageController      = TextEditingController(text: f['edad']?.toString() ?? '');
     _genderController   = TextEditingController(
       text: f['sexo'] == 'M'
@@ -69,19 +79,37 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               ? 'Femenino'
               : '',
     );
-    _locationController = TextEditingController(text: '');
+    _comunidadController = TextEditingController(text: '');
+    _municipioController = TextEditingController(text: '');
 
-    _categoryController  = TextEditingController(text: f['categoria_sintoma']?.toString() ?? '');
-    _weightController    = TextEditingController(text: f['peso_kg']?.toString() ?? '');
-    _heightController    = TextEditingController(text: f['talla_cm']?.toString() ?? '');
-    _systolicController  = TextEditingController(text: f['presion_sistolica']?.toString() ?? '');
-    _diastolicController = TextEditingController(text: f['presion_diastolica']?.toString() ?? '');
-    _glucoseController   = TextEditingController(text: f['glucosa_mg_dl']?.toString() ?? '');
-    _tempController      = TextEditingController(text: f['temperatura_c']?.toString() ?? '');
-    _heartRateController = TextEditingController(text: f['frecuencia_cardiaca_bpm']?.toString() ?? '');
-    _durationController  = TextEditingController(text: f['duracion_sintomas_dias']?.toString() ?? '');
+    _categoryController   = TextEditingController(text: f['categoria_sintoma']?.toString() ?? '');
+    _weightController     = TextEditingController(text: f['peso_kg']?.toString() ?? '');
+    _heightController     = TextEditingController(text: f['talla_cm']?.toString() ?? '');
+    _systolicController   = TextEditingController(text: f['presion_sistolica']?.toString() ?? '');
+    _diastolicController  = TextEditingController(text: f['presion_diastolica']?.toString() ?? '');
+    _glucoseController    = TextEditingController(text: f['glucosa_mg_dl']?.toString() ?? '');
+    _tempController       = TextEditingController(text: f['temperatura_c']?.toString() ?? '');
+    _heartRateController  = TextEditingController(text: f['frecuencia_cardiaca_bpm']?.toString() ?? '');
+    _durationController   = TextEditingController(text: f['duracion_sintomas_dias']?.toString() ?? '');
+    _saturacionController = TextEditingController(text: '');
 
+    _motivoController      = TextEditingController();
+    _diagnosticoController = TextEditingController();
+
+    _cargarComunidadPaciente();
     _captureGps();
+  }
+
+  // Prellena comunidad/municipio con los datos de identidad del paciente
+  // (capturados en el alta CURP), editable por si esta consulta ocurre en
+  // otro lugar (ej. brigada itinerante).
+  Future<void> _cargarComunidadPaciente() async {
+    final paciente = await sl<PatientLocalRepository>().obtenerPorId(widget.pacienteId);
+    if (!mounted || paciente == null) return;
+    setState(() {
+      _comunidadController.text = paciente.comunidad ?? '';
+      _municipioController.text = paciente.municipio ?? '';
+    });
   }
 
   // ── GPS: captura en background ─────────────────────────────────────────────
@@ -108,7 +136,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         _longitud  = pos.longitude;
         _gpsStatus = _GpsStatus.ready;
       });
-      if (_locationController.text.isEmpty) {
+      if (_comunidadController.text.isEmpty) {
         _tryReverseGeocode(pos.latitude, pos.longitude);
       }
     } catch (_) {
@@ -151,18 +179,18 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         if (state != null && state.isNotEmpty) state,
       ];
       final locality = parts.join(', ');
-      if (locality.isNotEmpty && _locationController.text.isEmpty) {
-        setState(() => _locationController.text = locality);
+      if (locality.isNotEmpty && _comunidadController.text.isEmpty) {
+        setState(() => _comunidadController.text = locality);
       }
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
     _ageController.dispose();
     _genderController.dispose();
-    _locationController.dispose();
+    _comunidadController.dispose();
+    _municipioController.dispose();
     _categoryController.dispose();
     _weightController.dispose();
     _heightController.dispose();
@@ -172,6 +200,9 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _tempController.dispose();
     _heartRateController.dispose();
     _durationController.dispose();
+    _saturacionController.dispose();
+    _motivoController.dispose();
+    _diagnosticoController.dispose();
     super.dispose();
   }
 
@@ -219,56 +250,94 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     };
   }
 
-  // ── Paso 3: buscar/crear paciente y guardar consulta en SQLite ───────────
+  // ── Guardar consulta (paciente ya identificado por CURP) en SQLite ───────
 
-  static String _normSimple(String s) =>
-      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  /// Combina lo detectado por el BiLSTM con las ediciones/campos manuales del
+  /// usuario en un solo mapa — esto es lo que queda en campos_extraidos y lo
+  /// que SyncService traduce al payload de POST /atenciones.
+  Map<String, dynamic> _buildFinalCampos(String personalId) {
+    final campos = Map<String, dynamic>.from(widget.clinicalFields);
 
-  Future<void> _saveAndSync() async {
-    final nombre    = _nameController.text.trim();
-    final localidad = _locationController.text.trim();
-
-    if (nombre.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Ingrese el nombre del paciente'),
-          backgroundColor: const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-      return;
-    }
-
-    // Verificar límite de 5 pacientes para rol usuario
-    if (!mounted) return;
-    final role = context.read<AuthProvider>().currentRole;
-    if (role == UserRole.usuario) {
-      final repo  = sl<PatientLocalRepository>();
-      final todos = await repo.getPacientes(null);
-      final normNuevo  = _normSimple(nombre);
-      final existeYa   = todos.any(
-        (r) => _normSimple(r.paciente.nombreCompleto) == normNuevo,
-      );
-      if (!existeYa && todos.length >= 5) {
-        if (!mounted) return;
-        _showLimitBottomSheet();
-        return;
+    void setTexto(String key, String value) {
+      if (value.trim().isEmpty) {
+        campos.remove(key);
+      } else {
+        campos[key] = value.trim();
       }
     }
 
-    final sexo = widget.clinicalFields['sexo'] as String?;
+    void setNum(String key, String value, {bool esEntero = false}) {
+      final v = value.trim();
+      if (v.isEmpty) {
+        campos.remove(key);
+        return;
+      }
+      campos[key] = esEntero ? (int.tryParse(v) ?? v) : (double.tryParse(v) ?? v);
+    }
+
+    setNum('edad', _ageController.text, esEntero: true);
+    final generoTexto = _genderController.text.trim();
+    if (generoTexto.isEmpty) {
+      campos.remove('sexo');
+    } else if (generoTexto == 'Masculino') {
+      campos['sexo'] = 'M';
+    } else if (generoTexto == 'Femenino') {
+      campos['sexo'] = 'F';
+    } else {
+      campos['sexo'] = generoTexto;
+    }
+    setTexto('categoria_sintoma', _categoryController.text);
+    setNum('peso_kg', _weightController.text);
+    setNum('talla_cm', _heightController.text);
+    setNum('presion_sistolica', _systolicController.text, esEntero: true);
+    setNum('presion_diastolica', _diastolicController.text, esEntero: true);
+    setNum('glucosa_mg_dl', _glucoseController.text, esEntero: true);
+    setNum('temperatura_c', _tempController.text);
+    setNum('frecuencia_cardiaca_bpm', _heartRateController.text, esEntero: true);
+    setNum('duracion_sintomas_dias', _durationController.text, esEntero: true);
+    setNum('saturacion_oxigeno', _saturacionController.text, esEntero: true);
+
+    campos['comunidad']       = _comunidadController.text.trim();
+    campos['municipio']       = _municipioController.text.trim();
+    campos['motivo_consulta'] = _motivoController.text.trim();
+    setTexto('diagnostico_descripcion', _diagnosticoController.text);
+    if (_medicamentos.isNotEmpty) {
+      campos['medicamentos'] = _medicamentos.map((m) => m.toJson()).toList();
+    } else {
+      campos.remove('medicamentos');
+    }
+    campos['personal_id'] = personalId;
+
+    return campos;
+  }
+
+  Future<void> _saveAndSync() async {
+    final municipio = _municipioController.text.trim();
+    final motivo    = _motivoController.text.trim();
+
+    if (municipio.isEmpty) {
+      _showErrorSnack('Ingresa el municipio de la consulta');
+      return;
+    }
+    if (motivo.isEmpty) {
+      _showErrorSnack('Ingresa el motivo de la consulta');
+      return;
+    }
+
+    final personalId = await sl<TokenStorage>().getPersonalId();
+    if (personalId == null || personalId.isEmpty) {
+      _showErrorSnack('Sesión inválida. Vuelve a iniciar sesión.');
+      return;
+    }
+
     bool saved = false;
     try {
-      final repo     = sl<PatientLocalRepository>();
-      final paciente = await repo.buscarOCrearPaciente(nombre, sexo, localidad);
+      final repo = sl<PatientLocalRepository>();
       await repo.guardarConsulta(
-        paciente.id,
+        widget.pacienteId,
         PatientRecord(
           textoOriginal:   widget.originalText,
-          camposExtraidos: widget.clinicalFields,
+          camposExtraidos: _buildFinalCampos(personalId),
           fechaCaptura:    DateTime.now(),
           latitud:         _latitud,
           longitud:        _longitud,
@@ -309,6 +378,10 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     }
 
     _syncToMl();
+    // Fire-and-forget: empuja lo pendiente (esta consulta y cualquier otra
+    // cosa en el outbox) a MS1/MS2. Si falla, ya quedó en SQLite y se
+    // reintenta en el próximo trigger.
+    sl<SyncService>().syncAll().catchError((_) => const SyncResumen());
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -356,82 +429,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     }).catchError((_) {});
   }
 
-  void _showLimitBottomSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Icon(
-              Icons.lock_outline_rounded,
-              size: 48,
-              color: Color(0xFFD97706),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Límite del plan Free alcanzado',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Has alcanzado el límite del plan Free (5 pacientes).\nActualiza tu plan para registros ilimitados.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF6B7280),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PlanesPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Ver planes',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+  void _showErrorSnack(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -458,6 +463,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   _buildClinicalCard(),
                   const SizedBox(height: 14),
                   _buildVitalsCard(),
+                  const SizedBox(height: 14),
+                  _buildConsultaCard(),
                   const SizedBox(height: 14),
                   _buildLocationCard(),
                   const SizedBox(height: 20),
@@ -604,7 +611,15 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           ],
         ),
         const SizedBox(height: 16),
-        _buildField('Nombre Completo', _nameController, isDetected: false, alwaysEditable: true),
+        Text(
+          'Nombre Completo',
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          widget.pacienteNombre,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
         const SizedBox(height: 12),
         _buildField('Edad', _ageController, isDetected: _detected('edad')),
         const SizedBox(height: 12),
@@ -821,8 +836,150 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        _buildField('Saturación de Oxígeno (%)', _saturacionController,
+            isDetected: false, alwaysEditable: true),
       ],
     );
+  }
+
+  // ── Card: Datos de la Consulta (manual, no lo extrae el BiLSTM) ──────────
+
+  Widget _buildConsultaCard() {
+    return _Card(
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.assignment_outlined, color: AppColors.primary, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'Datos de la Consulta',
+              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildField('Motivo de Consulta', _motivoController, isDetected: false, alwaysEditable: true),
+        const SizedBox(height: 12),
+        _buildField('Diagnóstico', _diagnosticoController, isDetected: false, alwaysEditable: true),
+        const SizedBox(height: 16),
+        _buildMedicamentosSection(),
+      ],
+    );
+  }
+
+  Widget _buildMedicamentosSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Medicamentos',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: _showAgregarMedicamentoDialog,
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.primary),
+                  SizedBox(width: 4),
+                  Text('Agregar', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (_medicamentos.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: _UndetectedRow(label: 'Sin medicamentos agregados'),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              children: _medicamentos.asMap().entries.map((entry) {
+                final m = entry.value;
+                final partes = [
+                  if (m.dosis != null && m.dosis!.isNotEmpty) m.dosis!,
+                  if (m.frecuencia != null && m.frecuencia!.isNotEmpty) m.frecuencia!,
+                  if (m.duracion != null && m.duracion!.isNotEmpty) m.duracion!,
+                ].join(' · ');
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.inputBackground,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(m.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            if (partes.isNotEmpty)
+                              Text(partes, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => setState(() => _medicamentos.removeAt(entry.key)),
+                        child: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showAgregarMedicamentoDialog() async {
+    final nombreCtrl = TextEditingController();
+    final dosisCtrl = TextEditingController();
+    final frecuenciaCtrl = TextEditingController();
+    final duracionCtrl = TextEditingController();
+
+    final agregado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Agregar medicamento'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+            TextField(controller: dosisCtrl, decoration: const InputDecoration(labelText: 'Dosis')),
+            TextField(controller: frecuenciaCtrl, decoration: const InputDecoration(labelText: 'Frecuencia')),
+            TextField(controller: duracionCtrl, decoration: const InputDecoration(labelText: 'Duración')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(nombreCtrl.text.trim().isNotEmpty),
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+
+    if (agregado == true && mounted) {
+      setState(() {
+        _medicamentos.add(Medicamento(
+          nombre: nombreCtrl.text.trim(),
+          dosis: dosisCtrl.text.trim().isEmpty ? null : dosisCtrl.text.trim(),
+          frecuencia: frecuenciaCtrl.text.trim().isEmpty ? null : frecuenciaCtrl.text.trim(),
+          duracion: duracionCtrl.text.trim().isEmpty ? null : duracionCtrl.text.trim(),
+        ));
+      });
+    }
   }
 
   // ── Card: Ubicación + mini mapa ───────────────────────────────────────────
@@ -835,7 +992,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
             SizedBox(width: 8),
             Text(
-              'Ubicación',
+              'Ubicación de la Consulta',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
@@ -845,7 +1002,9 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           ],
         ),
         const SizedBox(height: 14),
-        _buildField('Localidad', _locationController, isDetected: false, alwaysEditable: true),
+        _buildField('Municipio', _municipioController, isDetected: false, alwaysEditable: true),
+        const SizedBox(height: 12),
+        _buildField('Comunidad', _comunidadController, isDetected: false, alwaysEditable: true),
         const SizedBox(height: 6),
         _buildGpsRow(),
         const SizedBox(height: 14),

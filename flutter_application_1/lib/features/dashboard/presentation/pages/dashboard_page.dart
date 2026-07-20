@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
-import '../../../patients/presentation/pages/new_patient_selection_page.dart';
+import '../../../patients/presentation/pages/patient_registration_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
+import '../../../sync/data/sync_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -16,6 +18,23 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _currentNavIndex = 0;
+  bool _sincronizando = false;
+
+  Future<void> _sincronizarAhora() async {
+    if (_sincronizando) return;
+    setState(() => _sincronizando = true);
+    final resumen = await sl<SyncService>().syncAll();
+    if (!mounted) return;
+    setState(() => _sincronizando = false);
+    final mensaje = resumen.huboError
+        ? 'No se pudo sincronizar (sin conexión o servidor dormido). Se reintentará.'
+        : (resumen.pacientesSincronizados == 0 && resumen.atencionesSincronizadas == 0)
+            ? 'Todo está sincronizado.'
+            : 'Sincronizado: ${resumen.pacientesSincronizados} paciente(s), ${resumen.atencionesSincronizadas} consulta(s).';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mensaje), behavior: SnackBarBehavior.floating),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +64,7 @@ class _DashboardPageState extends State<DashboardPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const NewPatientSelectionPage(),
+            builder: (_) => const PatientRegistrationPage(),
           ),
         ),
         backgroundColor: AppColors.primary,
@@ -104,8 +123,13 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.cloud_outlined, color: AppColors.textSecondary, size: 22),
-          onPressed: () {},
+          icon: _sincronizando
+              ? const SizedBox(
+                  width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textSecondary),
+                )
+              : const Icon(Icons.cloud_outlined, color: AppColors.textSecondary, size: 22),
+          onPressed: _sincronizando ? null : _sincronizarAhora,
         ),
       ],
     );
