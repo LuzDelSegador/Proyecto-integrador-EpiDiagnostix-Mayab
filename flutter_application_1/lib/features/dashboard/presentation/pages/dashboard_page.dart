@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
-import '../../../auth/presentation/pages/login_page.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/presentation/pages/new_patient_selection_page.dart';
@@ -67,13 +65,9 @@ class _DashboardPageState extends State<DashboardPage> {
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
         icon: const Icon(Icons.account_circle_outlined, color: AppColors.textPrimary, size: 26),
-        onPressed: () async {
-          final navigator = Navigator.of(context);
-          await context.read<AuthProvider>().logout();
-          navigator.pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-          );
-        },
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfilePage()),
+        ),
       ),
       title: const Text(
         'EpiSurveillance',

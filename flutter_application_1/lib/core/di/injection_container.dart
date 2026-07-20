@@ -9,6 +9,7 @@ import '../../features/auth/domain/usecases/login_usecase.dart';
 import '../../features/auth/domain/usecases/register_usecase.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/patients/data/repositories/patient_local_repository.dart';
+import '../../features/anomalies/data/anomaly_service.dart';
 import '../../features/plans/data/plan_service.dart';
 
 final sl = GetIt.instance;
@@ -26,6 +27,7 @@ Future<void> init() async {
     () => AuthRepositoryImpl(sl()),
   );
   sl.registerLazySingleton(() => PatientLocalRepository());
+  sl.registerLazySingleton(() => AnomalyService(sl()));
   sl.registerLazySingleton(() => PlanService(sl()));
 
   // ── Data Sources ──────────────────────────────────────────────

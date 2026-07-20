@@ -43,6 +43,7 @@ class AuthProvider extends ChangeNotifier {
         nombreCompleto: _currentUser.name,
         tipo:           _currentUser.role,
       );
+      await _tokenStorage.setCorreo(identifier);
       _status = AuthStatus.success;
     } on UnauthorizedException catch (e) {
       _errorMessage = e.toString();
@@ -82,6 +83,7 @@ class AuthProvider extends ChangeNotifier {
         nombreCompleto: _currentUser.name,
         tipo:           _currentUser.role,
       );
+      await _tokenStorage.setCorreo(correo);
       _status = AuthStatus.success;
     } on ConflictException catch (e) {
       _errorMessage = e.toString();

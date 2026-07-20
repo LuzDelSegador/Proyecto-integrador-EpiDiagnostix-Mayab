@@ -1,12 +1,18 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_config.dart';
 import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../data/models/patient_record.dart';
 import '../../data/repositories/patient_local_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
+
+enum _GpsStatus { loading, ready, unavailable }
 
 class AudioConfirmationPage extends StatefulWidget {
   final Map<String, dynamic> clinicalFields;
@@ -24,6 +30,11 @@ class AudioConfirmationPage extends StatefulWidget {
 
 class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   bool _isEditing = false;
+
+  // ── GPS ────────────────────────────────────────────────────────────────────
+  double? _latitud;
+  double? _longitud;
+  _GpsStatus _gpsStatus = _GpsStatus.loading;
 
   // ── Perfil del paciente ────────────────────────────────────────────────────
   late final TextEditingController _nameController;
@@ -69,6 +80,81 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _tempController      = TextEditingController(text: f['temperatura_c']?.toString() ?? '');
     _heartRateController = TextEditingController(text: f['frecuencia_cardiaca_bpm']?.toString() ?? '');
     _durationController  = TextEditingController(text: f['duracion_sintomas_dias']?.toString() ?? '');
+
+    _captureGps();
+  }
+
+  // ── GPS: captura en background ─────────────────────────────────────────────
+
+  Future<void> _captureGps() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _gpsStatus = _GpsStatus.unavailable);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _latitud   = pos.latitude;
+        _longitud  = pos.longitude;
+        _gpsStatus = _GpsStatus.ready;
+      });
+      if (_locationController.text.isEmpty) {
+        _tryReverseGeocode(pos.latitude, pos.longitude);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _gpsStatus = _GpsStatus.unavailable);
+    }
+  }
+
+  Future<void> _tryReverseGeocode(double lat, double lng) async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      if (results.every((r) => r == ConnectivityResult.none)) return;
+
+      final response = await Dio().get<Map<String, dynamic>>(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'format': 'json',
+          'lat': lat,
+          'lon': lng,
+          'zoom': 10,
+          'accept-language': 'es',
+        },
+        options: Options(
+          headers: {'User-Agent': 'EpiDiagnostix/2.0'},
+          receiveTimeout: const Duration(seconds: 8),
+        ),
+      );
+
+      if (!mounted) return;
+      final address = response.data?['address'] as Map<String, dynamic>?;
+      if (address == null) return;
+
+      final city = address['city'] as String? ??
+          address['town'] as String? ??
+          address['village'] as String? ??
+          address['municipality'] as String?;
+      final state = address['state'] as String?;
+
+      final parts = <String>[
+        if (city != null && city.isNotEmpty) city,
+        if (state != null && state.isNotEmpty) state,
+      ];
+      final locality = parts.join(', ');
+      if (locality.isNotEmpty && _locationController.text.isEmpty) {
+        setState(() => _locationController.text = locality);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -87,6 +173,50 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _heartRateController.dispose();
     _durationController.dispose();
     super.dispose();
+  }
+
+  // ── GPS row widget ────────────────────────────────────────────────────────
+
+  Widget _buildGpsRow() {
+    return switch (_gpsStatus) {
+      _GpsStatus.loading => const Row(
+          children: [
+            SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: AppColors.textMuted,
+              ),
+            ),
+            SizedBox(width: 6),
+            Text(
+              'Obteniendo ubicación GPS...',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+      _GpsStatus.ready => Row(
+          children: [
+            const Icon(Icons.location_on, size: 12, color: AppColors.textMuted),
+            const SizedBox(width: 4),
+            Text(
+              'GPS: ${_latitud!.toStringAsFixed(4)}, ${_longitud!.toStringAsFixed(4)}',
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+      _GpsStatus.unavailable => const Row(
+          children: [
+            Icon(Icons.location_off, size: 12, color: AppColors.textMuted),
+            SizedBox(width: 4),
+            Text(
+              'GPS no disponible',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ),
+    };
   }
 
   // ── Paso 3: buscar/crear paciente y guardar consulta en SQLite ───────────
@@ -140,6 +270,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           textoOriginal:   widget.originalText,
           camposExtraidos: widget.clinicalFields,
           fechaCaptura:    DateTime.now(),
+          latitud:         _latitud,
+          longitud:        _longitud,
         ),
       );
       saved = true;
@@ -176,6 +308,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       return;
     }
 
+    _syncToMl();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
@@ -205,6 +339,21 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
+  }
+
+  // Fire-and-forget: manda el texto al MS de ML para reprocesarlo con NER + Isolation Forest.
+  // Si no hay red o el MS está apagado, falla silenciosamente (el registro ya quedó en SQLite).
+  void _syncToMl() {
+    Connectivity().checkConnectivity().then((results) async {
+      if (results.any((r) => r != ConnectivityResult.none)) {
+        try {
+          await sl<Dio>().post(
+            '$kBaseUrlML/consulta-completa',
+            data: {'texto': widget.originalText},
+          );
+        } catch (_) {}
+      }
+    }).catchError((_) {});
   }
 
   void _showLimitBottomSheet() {
@@ -697,6 +846,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         ),
         const SizedBox(height: 14),
         _buildField('Localidad', _locationController, isDetected: false, alwaysEditable: true),
+        const SizedBox(height: 6),
+        _buildGpsRow(),
         const SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
@@ -709,12 +860,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   size: const Size(double.infinity, 110),
                   painter: _MiniMapPainter(),
                 ),
-                const Positioned(
+                Positioned(
                   bottom: 6,
                   left: 8,
                   child: Text(
-                    'COORD: -12.1092, -77.0067',
-                    style: TextStyle(
+                    _latitud != null
+                        ? 'GPS: ${_latitud!.toStringAsFixed(4)}, ${_longitud!.toStringAsFixed(4)}'
+                        : 'GPS: buscando...',
+                    style: const TextStyle(
                       color: Colors.white54,
                       fontSize: 9,
                       letterSpacing: 0.4,

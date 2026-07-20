@@ -136,10 +136,29 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
         return;
       }
 
+      // Un WAV válido (cabecera + PCM) pesa más de 44 bytes. Si el permiso de
+      // micrófono fue denegado, record_android no captura audio y genera un
+      // archivo vacío/corrupto que Whisper no puede abrir.
+      final file = File(path);
+      if (!file.existsSync() || file.lengthSync() <= 44) {
+        if (mounted) setState(() => _recordState = _RecordState.idle);
+        _showSnack(
+            'No se capturó audio. Revisa el permiso de micrófono en Ajustes.');
+        _deleteFile(path);
+        return;
+      }
+
       _pendingAudioPath = path;
       if (mounted) setState(() => _recordState = _RecordState.transcribing);
       await _transcribeAudio(path);
     } else {
+      final hasPermission = await _recorder.hasPermission();
+      if (!hasPermission) {
+        _showSnack(
+            'Se necesita permiso de micrófono para grabar. Actívalo en Ajustes.');
+        return;
+      }
+
       _transcriptionController.clear();
       _recordingStart = DateTime.now();
 

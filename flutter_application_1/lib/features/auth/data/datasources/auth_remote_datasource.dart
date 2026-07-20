@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../../core/constants/app_config.dart';
 import '../../../../core/errors/app_exceptions.dart';
 import '../models/auth_model.dart';
 
@@ -27,7 +28,7 @@ class AuthRemoteDataSource implements IAuthRemoteDataSource {
   }) async {
     try {
       final response = await _dio.post(
-        '/auth/login',
+        '$kBaseUrlAuth/auth/login',
         data: {
           'correo':     identifier,
           'contrasena': password,
@@ -55,7 +56,7 @@ class AuthRemoteDataSource implements IAuthRemoteDataSource {
   }) async {
     try {
       final response = await _dio.post(
-        '/auth/register',
+        '$kBaseUrlAuth/auth/register',
         data: {
           'nombre_completo': nombreCompleto,
           'correo':          correo,

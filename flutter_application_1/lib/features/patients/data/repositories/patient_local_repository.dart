@@ -21,7 +21,7 @@ class PatientLocalRepository {
     final dbPath = await getDatabasesPath();
     return openDatabase(
       join(dbPath, _dbName),
-      version: 4,
+      version: 5,
       onCreate: (db, _) async {
         await _createPacientesTable(db);
         await _createConsultasTable(db);
@@ -35,13 +35,24 @@ class PatientLocalRepository {
           await _migrarConsultasPendientes(db);
           await db.execute('DROP TABLE IF EXISTS consultas_pendientes');
           await db.execute('DROP TABLE IF EXISTS patient_records');
-          // No necesita el bloque v4 porque la tabla recién creada ya tiene la columna.
+          // Salta al bloque v5 si aplica.
+          if (newVersion >= 5) {
+            await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
+            await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
+          }
         } else if (oldVersion == 3) {
           // La tabla pacientes existe pero sin nombre_normalizado → ALTER + backfill.
           await db.execute(
             'ALTER TABLE $_tPacientes ADD COLUMN nombre_normalizado TEXT',
           );
           await _poblarNombreNormalizado(db);
+          if (newVersion >= 5) {
+            await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
+            await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
+          }
+        } else if (oldVersion == 4) {
+          await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
+          await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
         }
       },
     );
@@ -69,7 +80,9 @@ class PatientLocalRepository {
       texto_original     TEXT    NOT NULL,
       campos_extraidos   TEXT    NOT NULL,
       sincronizado       INTEGER NOT NULL DEFAULT 0,
-      fecha_sincronizado TEXT
+      fecha_sincronizado TEXT,
+      latitud            REAL,
+      longitud           REAL
     )
   ''');
 
