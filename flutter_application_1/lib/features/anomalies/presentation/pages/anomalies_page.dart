@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/user_roles.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/widgets/upgrade_required_widget.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -10,6 +13,7 @@ import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/presentation/pages/new_patient_selection_page.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
+import '../../data/anomaly_service.dart';
 
 class AnomaliesPage extends StatefulWidget {
   const AnomaliesPage({super.key});
@@ -20,6 +24,216 @@ class AnomaliesPage extends StatefulWidget {
 
 class _AnomaliesPageState extends State<AnomaliesPage> {
   int _currentNavIndex = 1;
+
+  // ── Data state ────────────────────────────────────────────────────────────
+  bool _loading = false;
+  String? _error;
+  List<AnomalyResult> _historial = [];
+  DateTime? _ultimaSincronizacion;
+  Timer? _refreshTimer;
+
+  // ── Computed stats ────────────────────────────────────────────────────────
+  int _anomaliasHoy = 0;
+  int _anomaliasAyer = 0;
+  double _confianzaPromedio = 0.0;
+  String _nivelAlerta = 'BAJO';
+  Color _nivelAlertaColor = AppColors.success;
+  double _progresoAlerta = 0.2;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    _refreshTimer =
+        Timer.periodic(const Duration(minutes: 5), (_) => _loadData());
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await sl<AnomalyService>().getHistorial();
+      if (!mounted) return;
+      _computeStats(results);
+      setState(() {
+        _historial = results;
+        _ultimaSincronizacion = DateTime.now();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Sin conexión con el servidor de IA';
+        _loading = false;
+      });
+    }
+  }
+
+  void _computeStats(List<AnomalyResult> results) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    int hoy = 0, ayer = 0;
+    double totalConfianza = 0;
+    int countAnomalia = 0;
+
+    for (final r in results) {
+      final d = DateTime(r.createdAt.year, r.createdAt.month, r.createdAt.day);
+      if (r.esAnomalia) {
+        countAnomalia++;
+        totalConfianza += r.confianza;
+        if (d == today) {
+          hoy++;
+        } else if (d == yesterday) {
+          ayer++;
+        }
+      }
+    }
+
+    String nivel;
+    Color color;
+    double progreso;
+    if (hoy >= 6) {
+      nivel = 'ALTO';
+      color = AppColors.error;
+      progreso = 0.9;
+    } else if (hoy >= 3) {
+      nivel = 'MODERADO';
+      color = const Color(0xFFD97706);
+      progreso = 0.6;
+    } else {
+      nivel = 'BAJO';
+      color = AppColors.success;
+      progreso = 0.2;
+    }
+
+    _anomaliasHoy = hoy;
+    _anomaliasAyer = ayer;
+    _confianzaPromedio =
+        countAnomalia == 0 ? 0.0 : totalConfianza / countAnomalia;
+    _nivelAlerta = nivel;
+    _nivelAlertaColor = color;
+    _progresoAlerta = progreso;
+  }
+
+  String _formatRelative(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Ahora';
+    if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Hace ${diff.inHours} h';
+    return 'Hace ${diff.inDays} d';
+  }
+
+  // ── Dialogs ───────────────────────────────────────────────────────────────
+
+  void _showDetailDialog(AnomalyResult r) {
+    // tipo 'completa': muestra campos de extraccion no-null
+    // tipo 'anomalia': muestra score + nivel_riesgo + es_anomalia
+    final extraccion = r.outputJson?['extraccion'] as Map<String, dynamic>?;
+    final Map<String, String> detailEntries;
+    if (extraccion != null && extraccion.isNotEmpty) {
+      detailEntries = {
+        for (final e in extraccion.entries)
+          if (e.value != null) e.key: '${e.value}',
+      };
+    } else {
+      detailEntries = {
+        'score': r.score.toStringAsFixed(4),
+        'nivel_riesgo': r.nivelRiesgo,
+        'es_anomalia': '${r.esAnomalia}',
+      };
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Detalles de inferencia'),
+        content: SingleChildScrollView(
+          child: detailEntries.isEmpty
+              ? const Text('Sin datos adicionales disponibles.')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: detailEntries.entries
+                      .map(
+                        (e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: RichText(
+                            text: TextSpan(
+                              style: const TextStyle(
+                                  color: Colors.black87, fontSize: 13),
+                              children: [
+                                TextSpan(
+                                  text: '${e.key}: ',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                TextSpan(text: e.value),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportDialog(String disease, String location) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reportar a Central'),
+        content: Text('¿Confirmar reporte de "$disease" detectado en $location?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Reporte enviado a Central exitosamente'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: const Text(
+              'Confirmar',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -56,54 +270,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                         const SizedBox(height: 20),
                         _buildDetectionsHeader(),
                         const SizedBox(height: 12),
-                        _buildDetectionCard(
-                          icon: Icons.coronavirus_outlined,
-                          iconBg: const Color(0xFFFFE4E4),
-                          iconColor: const Color(0xFFDC2626),
-                          disease: 'Cólera (Sospecha)',
-                          badge: 'crítico',
-                          badgeColor: const Color(0xFFDC2626),
-                          location: 'Aldea San Marcos, Sector 4',
-                          cases: '8 casos nuevos',
-                          time: 'Hace 45 min',
-                          confidence: 98,
-                          actionLabel: 'Reportar a Central',
-                          actionBg: const Color(0xFFDC2626),
-                          actionFg: Colors.white,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetectionCard(
-                          icon: Icons.wb_sunny_outlined,
-                          iconBg: const Color(0xFFFEF3C7),
-                          iconColor: const Color(0xFFD97706),
-                          disease: 'Influenza Estacional',
-                          badge: 'ADVERTENCIA',
-                          badgeColor: const Color(0xFFD97706),
-                          location: 'Centro Urbano - Zona 1',
-                          cases: '24 casos acumulados',
-                          time: 'Hace 3 horas',
-                          confidence: 87,
-                          actionLabel: 'Investigar',
-                          actionBg: AppColors.primary,
-                          actionFg: Colors.white,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildDetectionCard(
-                          icon: Icons.biotech_outlined,
-                          iconBg: const Color(0xFFEDE9FE),
-                          iconColor: const Color(0xFF7C3AED),
-                          disease: 'Agente Desconocido',
-                          badge: 'RESERVACIÓN',
-                          badgeColor: const Color(0xFF1E3A5F),
-                          location: 'Periferia Norte',
-                          cases: '3 síntomas atípicos',
-                          time: 'Hace 6 horas',
-                          confidence: 67,
-                          actionLabel: 'Seguir Casos',
-                          actionBg: Colors.transparent,
-                          actionFg: AppColors.textSecondary,
-                          actionBorder: const Color(0xFFD1D5DB),
-                        ),
+                        _buildDetectionsBody(),
                         const SizedBox(height: 20),
                         _buildSpatialAnalysis(),
                         const SizedBox(height: 90),
@@ -158,7 +325,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
         IconButton(
           icon: const Icon(Icons.cloud_outlined,
               color: AppColors.textSecondary, size: 22),
-          onPressed: () {},
+          onPressed: _loadData,
         ),
       ],
     );
@@ -167,24 +334,31 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   // ── Sync banner ───────────────────────────────────────────────────────────
 
   Widget _buildSyncBanner() {
+    final auth = context.read<AuthProvider>();
+    final firstName = auth.currentUser.name.split(' ').first;
+    final dotColor = _error != null ? AppColors.error : AppColors.success;
+    final syncText = _ultimaSincronizacion == null
+        ? 'Sin sincronizar'
+        : 'Sincronizado: ${_formatRelative(_ultimaSincronizacion!)}';
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          const Icon(Icons.circle, color: AppColors.success, size: 8),
+          Icon(Icons.circle, color: dotColor, size: 8),
           const SizedBox(width: 6),
-          const Text(
-            'Sincronizado: Hace 2 min',
-            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          Text(
+            syncText,
+            style:
+                const TextStyle(fontSize: 11, color: AppColors.textSecondary),
           ),
           const SizedBox(width: 10),
-          Container(
-              width: 1, height: 12, color: const Color(0xFFE5E7EB)),
+          Container(width: 1, height: 12, color: const Color(0xFFE5E7EB)),
           const SizedBox(width: 10),
-          const Text(
-            'DISTRITO 7 - ACTIVO',
-            style: TextStyle(
+          Text(
+            '$firstName - ACTIVO',
+            style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
@@ -236,6 +410,12 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   }
 
   Widget _buildAnomaliesCard() {
+    final diff = _anomaliasHoy - _anomaliasAyer;
+    final trendText = diff >= 0 ? '+$diff' : '$diff';
+    final trendColor = diff > 0 ? AppColors.error : AppColors.success;
+    final trendIcon =
+        diff > 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -265,9 +445,9 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                '12',
-                style: TextStyle(
+              Text(
+                '$_anomaliasHoy',
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -279,19 +459,18 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.12),
+                  color: trendColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.trending_up_rounded,
-                        color: AppColors.success, size: 12),
-                    SizedBox(width: 2),
+                    Icon(trendIcon, color: trendColor, size: 12),
+                    const SizedBox(width: 2),
                     Text(
-                      '+15%',
+                      trendText,
                       style: TextStyle(
-                        color: AppColors.success,
+                        color: trendColor,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -336,23 +515,21 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: 0.62,
+              value: _progresoAlerta,
               minHeight: 8,
               backgroundColor: const Color(0xFFF3F4F6),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFD97706),
-              ),
+              valueColor: AlwaysStoppedAnimation<Color>(_nivelAlertaColor),
             ),
           ),
           const SizedBox(height: 8),
-          const Align(
+          Align(
             alignment: Alignment.centerRight,
             child: Text(
-              'MODERADO',
+              _nivelAlerta,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFD97706),
+                color: _nivelAlertaColor,
                 letterSpacing: 0.4,
               ),
             ),
@@ -365,6 +542,8 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   // ── Confidence card ───────────────────────────────────────────────────────
 
   Widget _buildConfidenceCard() {
+    final pct = _confianzaPromedio.toStringAsFixed(1);
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -391,20 +570,20 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Row(
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      '94.2%',
-                      style: TextStyle(
+                      '$pct%',
+                      style: const TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         height: 1,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.verified_outlined,
+                    const SizedBox(width: 8),
+                    const Icon(Icons.verified_outlined,
                         color: Colors.white70, size: 20),
                   ],
                 ),
@@ -441,14 +620,13 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           ),
         ),
         GestureDetector(
-          onTap: () {},
-          child: Row(
+          onTap: _loadData,
+          child: const Row(
             children: [
-              const Icon(Icons.filter_list_rounded,
-                  color: AppColors.primary, size: 16),
-              const SizedBox(width: 4),
-              const Text(
-                'Filtrar',
+              Icon(Icons.refresh_rounded, color: AppColors.primary, size: 16),
+              SizedBox(width: 4),
+              Text(
+                'Actualizar',
                 style: TextStyle(
                   color: AppColors.primary,
                   fontSize: 13,
@@ -459,6 +637,164 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── Detections body (4 states) ────────────────────────────────────────────
+
+  Widget _buildDetectionsBody() {
+    if (_loading && _historial.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null && _historial.isEmpty) {
+      return _buildErrorCard();
+    }
+
+    final anomalias = _historial
+        .where((r) => r.nivelRiesgo == 'anomalo' || r.nivelRiesgo == 'sospechoso')
+        .toList();
+
+    if (anomalias.isEmpty) {
+      return _buildEmptyCard();
+    }
+
+    return Column(
+      children: anomalias
+          .map(
+            (r) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildDetectionCardFromResult(r),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildErrorCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_outlined,
+              color: AppColors.error, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _error!,
+              style: const TextStyle(color: AppColors.error, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _loadData,
+            child: const Text('Reintentar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.check_circle_outline,
+              color: AppColors.success, size: 24),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sin anomalías detectadas',
+                  style: TextStyle(
+                    color: AppColors.success,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'El sistema está monitoreando activamente sin detectar patrones anómalos.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetectionCardFromResult(AnomalyResult r) {
+    final isCritico = r.nivelRiesgo == 'anomalo';
+    final confianza = r.confianza.round();
+
+    final titulo = r.categoriaSintoma != null
+        ? 'Categoría: ${r.categoriaSintoma}'
+        : isCritico
+            ? 'Patrón Clínico Crítico'
+            : 'Patrón Clínico Sospechoso';
+
+    final List<String> detalles = [];
+    if (r.temperatura != null && r.temperatura! >= 38) {
+      detalles.add('Fiebre ${r.temperatura}°C');
+    }
+    if (r.glucosa != null && r.glucosa! >= 200) {
+      detalles.add('Glucosa elevada ${r.glucosa} mg/dL');
+    }
+    if (r.presionSistolica != null && r.presionSistolica! >= 180) {
+      detalles.add('HTA severa ${r.presionSistolica} mmHg');
+    }
+    if (detalles.isEmpty) { detalles.add('Score: ${r.score.toStringAsFixed(4)}'); }
+    final cases = detalles.join(' · ');
+
+    final sexoStr =
+        r.sexo == 'M' ? 'masculino' : r.sexo == 'F' ? 'femenino' : '';
+    final ubicacion = (r.tipo == 'completa' && r.edad != null)
+        ? 'Paciente${sexoStr.isEmpty ? '' : ' $sexoStr'} · ${r.edad} años'
+        : 'Detección automática ML';
+
+    return _buildDetectionCard(
+      icon: isCritico
+          ? Icons.coronavirus_outlined
+          : Icons.warning_amber_outlined,
+      iconBg: isCritico
+          ? const Color(0xFFFFE4E4)
+          : const Color(0xFFFEF3C7),
+      iconColor: isCritico ? AppColors.error : const Color(0xFFD97706),
+      disease: titulo,
+      badge: isCritico ? 'CRÍTICO' : 'ADVERTENCIA',
+      badgeColor: isCritico ? AppColors.error : const Color(0xFFD97706),
+      location: ubicacion,
+      cases: cases,
+      time: _formatRelative(r.createdAt),
+      confidence: confianza,
+      actionLabel: isCritico ? 'Reportar a Central' : 'Ver detalles',
+      actionBg: isCritico ? AppColors.error : AppColors.primary,
+      actionFg: Colors.white,
+      onAction: isCritico
+          ? () => _showReportDialog(titulo, ubicacion)
+          : () => _showDetailDialog(r),
+      onViewDetail: () => _showDetailDialog(r),
     );
   }
 
@@ -479,6 +815,8 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     required Color actionBg,
     required Color actionFg,
     Color? actionBorder,
+    VoidCallback? onAction,
+    VoidCallback? onViewDetail,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -563,7 +901,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           // Cases + time
           Row(
             children: [
-              const Icon(Icons.group_outlined,
+              const Icon(Icons.fingerprint_outlined,
                   color: AppColors.textMuted, size: 14),
               const SizedBox(width: 4),
               Text(
@@ -583,38 +921,33 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
             ],
           ),
           const SizedBox(height: 10),
-          // Confidence + action row
-          Row(
-            children: [
-              Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    style: const TextStyle(fontSize: 12),
-                    children: [
-                      const TextSpan(
-                        text: 'IA Confianza: ',
-                        style: TextStyle(color: AppColors.textMuted),
-                      ),
-                      TextSpan(
-                        text: '$confidence%',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+          // Confidence
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 12),
+              children: [
+                const TextSpan(
+                  text: 'IA Confianza: ',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
+                TextSpan(
+                  text: '$confidence%',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 10),
+          // Action row
           Row(
             children: [
               SizedBox(
                 height: 34,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: onAction,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: actionBg,
                     foregroundColor: actionFg,
@@ -638,15 +971,18 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                  borderRadius: BorderRadius.circular(8),
+              GestureDetector(
+                onTap: onViewDetail,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.remove_red_eye_outlined,
+                      color: AppColors.textMuted, size: 18),
                 ),
-                child: const Icon(Icons.remove_red_eye_outlined,
-                    color: AppColors.textMuted, size: 18),
               ),
             ],
           ),
@@ -679,12 +1015,12 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
+        const Row(
           children: [
-            const Icon(Icons.my_location_rounded,
+            Icon(Icons.my_location_rounded,
                 color: AppColors.primary, size: 14),
-            const SizedBox(width: 6),
-            const Text(
+            SizedBox(width: 6),
+            Text(
               'Foco Detectado',
               style: TextStyle(
                 fontSize: 12,
@@ -692,8 +1028,8 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 8),
-            const Text(
+            SizedBox(width: 8),
+            Text(
               'Radio de 2km en expansión',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../core/constants/app_config.dart';
 
 class SolicitudResult {
   final String solicitudId;
@@ -37,7 +38,7 @@ class PlanService {
   }) async {
     try {
       final response = await _dio.post(
-        '/auth/solicitar-premium',
+        '$kBaseUrlAuth/auth/solicitar-premium',
         data: {
           'numero_cedula': numeroCedula,
           'nombre_en_cedula': nombreEnCedula,
@@ -55,7 +56,7 @@ class PlanService {
   /// GET /auth/mi-solicitud — devuelve null si el backend responde 404.
   Future<SolicitudResult?> getMiSolicitud() async {
     try {
-      final response = await _dio.get('/auth/mi-solicitud');
+      final response = await _dio.get('$kBaseUrlAuth/auth/mi-solicitud');
       return SolicitudResult.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;

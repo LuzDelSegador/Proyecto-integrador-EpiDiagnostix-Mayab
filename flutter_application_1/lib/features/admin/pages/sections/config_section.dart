@@ -37,10 +37,17 @@ class ConfigSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _ConfigItem(
-                    label: 'URL del backend',
-                    value: kBaseUrl,
+                    label: 'Backend MS1 (Auth / Pacientes)',
+                    value: kBaseUrlAuth,
                     icon: Icons.dns_outlined,
-                    onCopy: () => _copy(context, kBaseUrl, 'URL copiada'),
+                    onCopy: () => _copy(context, kBaseUrlAuth, 'URL copiada'),
+                  ),
+                  const Divider(height: 28),
+                  _ConfigItem(
+                    label: 'Backend MS2 (NER / Isolation Forest)',
+                    value: kBaseUrlML,
+                    icon: Icons.psychology_outlined,
+                    onCopy: () => _copy(context, kBaseUrlML, 'URL copiada'),
                   ),
                   const Divider(height: 28),
                   _ConfigItem(

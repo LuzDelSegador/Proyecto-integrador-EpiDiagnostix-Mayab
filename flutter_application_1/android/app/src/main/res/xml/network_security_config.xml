@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- MS2: ML/NER — AWS EC2 pública -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">44.206.197.26</domain>
+    </domain-config>
+    <!-- MS1: auth/admin — red local de desarrollo -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.144.152.83</domain>
+    </domain-config>
+</network-security-config>

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../core/constants/app_config.dart';
 import 'admin_models.dart';
 
 class AdminDataSource {
@@ -7,13 +8,13 @@ class AdminDataSource {
   const AdminDataSource(this._dio);
 
   Future<StatsModel> getEstadisticas() async {
-    final res = await _dio.get('/admin/estadisticas');
+    final res = await _dio.get('$kBaseUrlAuth/admin/estadisticas');
     return StatsModel.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<List<SolicitudAdminModel>> getSolicitudes(String estado) async {
     final res = await _dio.get(
-      '/admin/solicitudes',
+      '$kBaseUrlAuth/admin/solicitudes',
       queryParameters: {'estado': estado},
     );
     return (res.data as List)
@@ -22,19 +23,19 @@ class AdminDataSource {
   }
 
   Future<void> aprobarSolicitud(String id) async {
-    await _dio.patch('/admin/solicitudes/$id/aprobar');
+    await _dio.patch('$kBaseUrlAuth/admin/solicitudes/$id/aprobar');
   }
 
   Future<void> rechazarSolicitud(String id, String motivo) async {
     await _dio.patch(
-      '/admin/solicitudes/$id/rechazar',
+      '$kBaseUrlAuth/admin/solicitudes/$id/rechazar',
       data: {'motivo_rechazo': motivo},
     );
   }
 
   Future<List<UsuarioAdminModel>> getUsuarios(String? tipo) async {
     final res = await _dio.get(
-      '/admin/usuarios',
+      '$kBaseUrlAuth/admin/usuarios',
       queryParameters: tipo != null ? {'tipo': tipo} : null,
     );
     return (res.data as List)

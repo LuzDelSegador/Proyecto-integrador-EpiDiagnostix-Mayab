@@ -5,6 +5,7 @@ class TokenStorage {
   static const _keyPersonalId = 'personal_id';
   static const _keyNombre     = 'nombre_completo';
   static const _keyTipo       = 'tipo';
+  static const _keyCorreo     = 'correo';
 
   final _storage = const FlutterSecureStorage();
   String? _cachedToken;
@@ -35,6 +36,7 @@ class TokenStorage {
       _storage.delete(key: _keyPersonalId),
       _storage.delete(key: _keyNombre),
       _storage.delete(key: _keyTipo),
+      _storage.delete(key: _keyCorreo),
     ]);
   }
 
@@ -51,4 +53,8 @@ class TokenStorage {
   Future<String?> getNombre()     => _storage.read(key: _keyNombre);
   Future<String?> getPersonalId() => _storage.read(key: _keyPersonalId);
   Future<String?> getTipo()       => _storage.read(key: _keyTipo);
+  Future<String?> getCorreo()     => _storage.read(key: _keyCorreo);
+
+  Future<void> setCorreo(String correo) =>
+      _storage.write(key: _keyCorreo, value: correo);
 }

@@ -6,6 +6,8 @@ class PatientRecord {
   final DateTime fechaCaptura;
   final bool sincronizado;
   final DateTime? fechaSincronizado;
+  final double? latitud;
+  final double? longitud;
 
   const PatientRecord({
     required this.textoOriginal,
@@ -13,6 +15,8 @@ class PatientRecord {
     required this.fechaCaptura,
     this.sincronizado = false,
     this.fechaSincronizado,
+    this.latitud,
+    this.longitud,
   });
 
   Map<String, Object?> toMap() => {
@@ -21,5 +25,7 @@ class PatientRecord {
     'campos_extraidos':   jsonEncode(camposExtraidos),
     'sincronizado':       sincronizado ? 1 : 0,
     'fecha_sincronizado': fechaSincronizado?.toIso8601String(),
+    'latitud':            latitud,
+    'longitud':           longitud,
   };
 }
