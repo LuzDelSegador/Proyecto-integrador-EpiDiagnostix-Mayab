@@ -10,13 +10,13 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 import '../../../patients/data/models/paciente.dart';
 import '../../../patients/data/repositories/patient_local_repository.dart';
-import '../../../patients/presentation/pages/new_patient_selection_page.dart';
 import '../../../patients/presentation/pages/paciente_detalle_page.dart';
+import '../../../patients/presentation/widgets/add_case_choice_sheet.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 
 class CasosPage extends StatefulWidget {
-  const CasosPage({super.key});
+  CasosPage({super.key});
 
   @override
   State<CasosPage> createState() => _CasosPageState();
@@ -47,7 +47,7 @@ class _CasosPageState extends State<CasosPage> {
 
   void _onSearchChanged() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), _loadPacientes);
+    _debounce = Timer(Duration(milliseconds: 300), _loadPacientes);
   }
 
   Future<void> _loadPacientes() async {
@@ -65,7 +65,7 @@ class _CasosPageState extends State<CasosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -82,23 +82,22 @@ class _CasosPageState extends State<CasosPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
-        icon: const Icon(Icons.account_circle_outlined,
-            color: AppColors.textPrimary, size: 26),
+        icon: Icon(Icons.account_circle_outlined,
+            color: AppColors.of(context).textPrimary, size: 26),
         onPressed: () {
           context.read<AuthProvider>().resetStatus();
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
+            MaterialPageRoute(builder: (_) => LoginPage()),
           );
         },
       ),
-      title: const Text(
+      title: Text(
         'Listado de Pacientes',
         style: TextStyle(
-          color: AppColors.textPrimary,
+          color: AppColors.of(context).textPrimary,
           fontWeight: FontWeight.bold,
           fontSize: 18,
         ),
@@ -106,7 +105,7 @@ class _CasosPageState extends State<CasosPage> {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.sync_rounded, color: AppColors.primary, size: 24),
+          icon: Icon(Icons.sync_rounded, color: AppColors.of(context).primary, size: 24),
           onPressed: _loadPacientes,
         ),
       ],
@@ -117,9 +116,9 @@ class _CasosPageState extends State<CasosPage> {
 
   Widget _buildSyncBanner() {
     return Container(
-      color: const Color(0xFF1B6E52),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-      child: const Row(
+      color: Color(0xFF1B6E52),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      child: Row(
         children: [
           Icon(Icons.cloud_done_outlined, color: Colors.white70, size: 16),
           SizedBox(width: 8),
@@ -138,25 +137,25 @@ class _CasosPageState extends State<CasosPage> {
 
   Widget _buildSearchBar() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      color: AppColors.of(context).surface,
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
           Expanded(
             child: Container(
               height: 42,
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
+                color: Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                decoration: const InputDecoration(
+                style: TextStyle(fontSize: 13, color: AppColors.of(context).textPrimary),
+                decoration: InputDecoration(
                   hintText: 'Buscar por nombre',
-                  hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  hintStyle: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
                   prefixIcon: Icon(Icons.search_rounded,
-                      color: AppColors.textMuted, size: 20),
+                      color: AppColors.of(context).textMuted, size: 20),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -172,18 +171,18 @@ class _CasosPageState extends State<CasosPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
     if (_pacientes.isEmpty) {
       return _buildEmptyState();
     }
     return RefreshIndicator(
       onRefresh: _loadPacientes,
-      color: AppColors.primary,
+      color: AppColors.of(context).primary,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
         itemCount: _pacientes.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => SizedBox(height: 10),
         itemBuilder: (_, i) => _buildPacienteCard(_pacientes[i]),
       ),
     );
@@ -192,19 +191,19 @@ class _CasosPageState extends State<CasosPage> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.folder_open_outlined,
-                size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            const Text(
+                size: 56, color: AppColors.of(context).textMuted.withValues(alpha: 0.5)),
+            SizedBox(height: 16),
+            Text(
               'No hay pacientes registrados aún.\nUsa el micrófono para registrar la primera consulta.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
                 height: 1.5,
               ),
             ),
@@ -226,18 +225,18 @@ class _CasosPageState extends State<CasosPage> {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -246,54 +245,54 @@ class _CasosPageState extends State<CasosPage> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    backgroundColor: AppColors.of(context).primary.withValues(alpha: 0.1),
                     child: Text(
                       _initials(p.nombreCompleto),
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: AppColors.of(context).primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           p.nombreCompleto,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: AppColors.of(context).textPrimary,
                           ),
                         ),
                         if (p.comunidad != null && p.comunidad!.isNotEmpty) ...[
-                          const SizedBox(height: 2),
+                          SizedBox(height: 2),
                           Text(
                             p.comunidad!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: AppColors.of(context).textSecondary,
                             ),
                           ),
                         ],
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: AppColors.textMuted, size: 20),
+                  Icon(Icons.chevron_right_rounded,
+                      color: AppColors.of(context).textMuted, size: 20),
                 ],
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
                 '${p.totalVisitas} visita${p.totalVisitas == 1 ? '' : 's'} en total · '
                 'última vez: ${_formatDate(p.ultimaVisita)}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
               ),
               if (semana >= 3 || semana > 1) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
@@ -301,14 +300,14 @@ class _CasosPageState extends State<CasosPage> {
                     if (semana >= 3)
                       _Badge(
                         label: '⚠ Revisión frecuente',
-                        bg: const Color(0xFFFFE4E4),
-                        fg: const Color(0xFFDC2626),
+                        bg: Color(0xFFFFE4E4),
+                        fg: Color(0xFFDC2626),
                       ),
                     if (semana > 1)
                       _Badge(
                         label: '$semana visitas esta semana',
-                        bg: const Color(0xFFFEF3C7),
-                        fg: const Color(0xFFD97706),
+                        bg: Color(0xFFFEF3C7),
+                        fg: Color(0xFFD97706),
                       ),
                   ],
                 ),
@@ -330,7 +329,7 @@ class _CasosPageState extends State<CasosPage> {
     final dashboard = _TabItem(
       icon: Icons.dashboard_outlined,
       activeIcon: Icons.dashboard,
-      label: 'Dashboard',
+      label: 'Inicio',
       navigate: () => nav.popUntil((r) => r.isFirst),
     );
     final casos = _TabItem(
@@ -343,16 +342,19 @@ class _CasosPageState extends State<CasosPage> {
       icon: Icons.person_add_outlined,
       activeIcon: Icons.person_add,
       label: 'Nuevo',
-      navigate: () => nav.push(
-        MaterialPageRoute(builder: (_) => const NewPatientSelectionPage()),
-      ),
+      // No navega a otra página (solo abre un sheet encima), así que al
+      // cerrarlo hay que devolver el resaltado del tab a "Casos".
+      navigate: () async {
+        await showAddCaseChoiceSheet(context);
+        if (mounted) setState(() => _currentNavIndex = 1);
+      },
     );
     final anomalias = _TabItem(
       icon: Icons.warning_amber_outlined,
       activeIcon: Icons.warning_amber_rounded,
       label: 'Anomalías',
       navigate: () => nav.pushReplacement(
-        MaterialPageRoute(builder: (_) => const AnomaliesPage()),
+        MaterialPageRoute(builder: (_) => AnomaliesPage()),
       ),
     );
     final mapa = _TabItem(
@@ -360,7 +362,7 @@ class _CasosPageState extends State<CasosPage> {
       activeIcon: Icons.map,
       label: 'Mapa',
       navigate: () => nav.push(
-        MaterialPageRoute(builder: (_) => const MapaPage()),
+        MaterialPageRoute(builder: (_) => MapaPage()),
       ),
     );
     final servicios = _TabItem(
@@ -368,7 +370,7 @@ class _CasosPageState extends State<CasosPage> {
       activeIcon: Icons.medical_services,
       label: 'Servicios',
       navigate: () => nav.push(
-        MaterialPageRoute(builder: (_) => const ServiciosPage()),
+        MaterialPageRoute(builder: (_) => ServiciosPage()),
       ),
     );
     final planes = _TabItem(
@@ -376,7 +378,7 @@ class _CasosPageState extends State<CasosPage> {
       activeIcon: Icons.star_rounded,
       label: 'Planes',
       navigate: () => nav.push(
-        MaterialPageRoute(builder: (_) => const PlanesPage()),
+        MaterialPageRoute(builder: (_) => PlanesPage()),
       ),
     );
 
@@ -397,13 +399,12 @@ class _CasosPageState extends State<CasosPage> {
         setState(() => _currentNavIndex = i); // resalta el tab tocado
         tabs[i].navigate?.call();             // navega si no es la página actual
       },
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textMuted,
-      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.of(context).primary,
+      unselectedItemColor: AppColors.of(context).textMuted,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle:
-          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 10),
+          TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 10),
       elevation: 10,
       items: tabs
           .map((t) => BottomNavigationBarItem(
@@ -439,7 +440,7 @@ class _TabItem {
   final String label;
   final VoidCallback? navigate;
 
-  const _TabItem({
+  _TabItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
@@ -453,12 +454,12 @@ class _Badge extends StatelessWidget {
   final String label;
   final Color bg;
   final Color fg;
-  const _Badge({required this.label, required this.bg, required this.fg});
+  _Badge({required this.label, required this.bg, required this.fg});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(6),

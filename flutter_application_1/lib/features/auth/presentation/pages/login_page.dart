@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import 'register_page.dart';
@@ -7,7 +6,7 @@ import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../providers/auth_provider.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  LoginPage({super.key});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -45,35 +44,35 @@ class _LoginPageState extends State<LoginPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
+          MaterialPageRoute(builder: (_) => DashboardPage()),
         );
       });
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.of(context).background,
       appBar: AppBar(
-        backgroundColor: AppColors.statusBarBackground,
+        backgroundColor: AppColors.of(context).statusBarBackground,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Inicio de Sesión - Personal de Salud',
           style: TextStyle(color: Colors.white, fontSize: 13),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
           children: [
             _buildLogo(),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             _buildFormCard(authStatus),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildInfoBox(),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             _buildFooter(),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _buildRegisterLink(context),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
         ),
       ),
@@ -85,41 +84,25 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(12),
-          child: SvgPicture.asset(
-            'assets/images/health_logo.svg',
-            width: 48,
-            height: 48,
-          ),
+        Image.asset(
+          'assets/images/app_icon_mark.png',
+          width: 96,
+          height: 96,
         ),
-        const SizedBox(height: 14),
-        const Text(
-          'EpiSurveillance',
+        SizedBox(height: 14),
+        Text(
+          'EpiDiagnostix-Mayab',
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
             letterSpacing: 0.3,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
+        SizedBox(height: 4),
+        Text(
           'Portal de Vigilancia Epidemiológica',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
         ),
       ],
     );
@@ -129,15 +112,15 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildFormCard(AuthStatus authStatus) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -146,23 +129,23 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Inicio de Sesión',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
               ),
             ),
-            const SizedBox(height: 4),
-            const Text(
+            SizedBox(height: 4),
+            Text(
               'Ingrese sus credenciales autorizadas',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             _buildErrorBanner(authStatus),
             _buildFieldLabel('Identificación de Personal / Correo'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _identifierController,
               keyboardType: TextInputType.emailAddress,
@@ -174,9 +157,9 @@ class _LoginPageState extends State<LoginPage> {
                   ? 'Ingrese su identificación o correo'
                   : null,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildFieldLabel('Contraseña'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
@@ -189,7 +172,7 @@ class _LoginPageState extends State<LoginPage> {
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -199,9 +182,9 @@ class _LoginPageState extends State<LoginPage> {
               validator: (v) =>
                   (v == null || v.isEmpty) ? 'Ingrese su contraseña' : null,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildRememberRow(),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             _buildSubmitButton(authStatus),
           ],
         ),
@@ -212,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildFieldLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: Color(0xFF374151),
@@ -229,13 +212,13 @@ class _LoginPageState extends State<LoginPage> {
           child: Checkbox(
             value: _rememberSession,
             onChanged: (v) => setState(() => _rememberSession = v ?? false),
-            activeColor: AppColors.primary,
+            activeColor: AppColors.of(context).primary,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           ),
         ),
-        const SizedBox(width: 8),
-        const Expanded(
+        SizedBox(width: 8),
+        Expanded(
           child: Text(
             'Recordar sesión',
             style: TextStyle(fontSize: 13, color: Color(0xFF374151)),
@@ -243,11 +226,11 @@ class _LoginPageState extends State<LoginPage> {
         ),
         GestureDetector(
           onTap: () {},
-          child: const Text(
+          child: Text(
             '¿Olvidó su contraseña?',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.primary,
+              color: AppColors.of(context).primary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -257,29 +240,29 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildErrorBanner(AuthStatus authStatus) {
-    if (authStatus != AuthStatus.error) return const SizedBox.shrink();
+    if (authStatus != AuthStatus.error) return SizedBox.shrink();
 
     final errorMessage = context.select<AuthProvider, String?>(
       (p) => p.errorMessage,
     );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: 16),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.errorBackground,
+          color: AppColors.of(context).errorBackground,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.errorBorder),
+          border: Border.all(color: AppColors.of(context).errorBorder),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 18),
-            const SizedBox(width: 8),
+            Icon(Icons.error_outline, color: AppColors.of(context).error, size: 18),
+            SizedBox(width: 8),
             Expanded(
               child: Text(
                 errorMessage ?? 'Error al iniciar sesión.',
-                style: const TextStyle(color: AppColors.error, fontSize: 13),
+                style: TextStyle(color: AppColors.of(context).error, fontSize: 13),
               ),
             ),
           ],
@@ -297,8 +280,8 @@ class _LoginPageState extends State<LoginPage> {
       child: ElevatedButton(
         onPressed: isLoading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
+          backgroundColor: AppColors.of(context).primary,
+          disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.7),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -306,7 +289,7 @@ class _LoginPageState extends State<LoginPage> {
           elevation: 2,
         ),
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
@@ -314,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                   strokeWidth: 2.5,
                 ),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
@@ -336,16 +319,16 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildInfoBox() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.infoBackground,
+        color: AppColors.of(context).infoBackground,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.infoBorder),
+        border: Border.all(color: AppColors.of(context).infoBorder),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: AppColors.info, size: 18),
+          Icon(Icons.info_outline, color: AppColors.of(context).info, size: 18),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -365,7 +348,7 @@ class _LoginPageState extends State<LoginPage> {
   // ── Footer ──────────────────────────────────────────────────────────────────
 
   Widget _buildFooter() {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _FooterLink('Ayuda Técnica'),
@@ -373,7 +356,7 @@ class _LoginPageState extends State<LoginPage> {
         _FooterLink('Privacidad de Datos'),
         Text(
           '  v2.4.0',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(color: AppColors.of(context).textMuted, fontSize: 12),
         ),
       ],
     );
@@ -382,24 +365,24 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildRegisterLink(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const RegisterPage()),
+        MaterialPageRoute(builder: (_) => RegisterPage()),
       ),
       child: RichText(
-        text: const TextSpan(
-          style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+        text: TextSpan(
+          style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
           children: [
             TextSpan(text: '¿No tienes cuenta?  '),
             TextSpan(
               text: 'Registrarse',
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             TextSpan(
               text: ' →',
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -417,31 +400,31 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inputBackground,
-      prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+      fillColor: AppColors.of(context).inputBackground,
+      prefixIcon: Icon(icon, color: AppColors.of(context).textMuted, size: 20),
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+      hintStyle: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error),
+        borderSide: BorderSide(color: AppColors.of(context).error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).error, width: 1.5),
       ),
     );
   }
@@ -451,7 +434,7 @@ class _LoginPageState extends State<LoginPage> {
 
 class _FooterLink extends StatelessWidget {
   final String label;
-  const _FooterLink(this.label);
+  _FooterLink(this.label);
 
   @override
   Widget build(BuildContext context) {
@@ -459,20 +442,20 @@ class _FooterLink extends StatelessWidget {
       onTap: () {},
       child: Text(
         label,
-        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        style: TextStyle(color: AppColors.of(context).textSecondary, fontSize: 12),
       ),
     );
   }
 }
 
 class _FooterDot extends StatelessWidget {
-  const _FooterDot();
+  _FooterDot();
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
+    return Text(
       '  •  ',
-      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+      style: TextStyle(color: AppColors.of(context).textMuted, fontSize: 12),
     );
   }
 }

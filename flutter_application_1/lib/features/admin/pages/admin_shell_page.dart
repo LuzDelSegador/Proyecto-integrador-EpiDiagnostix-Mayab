@@ -20,7 +20,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
   int _selectedIndex = 0;
 
   static const _sectionTitles = [
-    'Dashboard',
+    'Panel',
     'Solicitudes Premium',
     'Usuarios',
     'Configuración',
@@ -58,9 +58,9 @@ class _AdminShellPageState extends State<AdminShellPage> {
                         onGoToSolicitudes: () =>
                             setState(() => _selectedIndex = 1),
                       ),
-                      const SolicitudesSection(),
-                      const UsuariosSection(),
-                      const ConfigSection(),
+                      SolicitudesSection(),
+                      UsuariosSection(),
+                      ConfigSection(),
                     ],
                   ),
                 ),
@@ -75,16 +75,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
   Widget _buildSidebar(int pendingCount) {
     return Container(
       width: 200,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).surface,
+        border: Border(right: BorderSide(color: AppColors.of(context).border)),
       ),
       child: Column(
         children: [
           // Brand header
           Container(
             height: 64,
-            color: AppColors.primary,
+            color: AppColors.of(context).primary,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             alignment: Alignment.centerLeft,
             child: const Text(
@@ -104,7 +104,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
               child: Column(
                 children: [
                   _NavItem(
-                    label: 'Dashboard',
+                    label: 'Panel',
                     icon: Icons.dashboard_outlined,
                     selectedIcon: Icons.dashboard,
                     index: 0,
@@ -149,18 +149,18 @@ class _AdminShellPageState extends State<AdminShellPage> {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).surface,
+        border: Border(bottom: BorderSide(color: AppColors.of(context).border)),
       ),
       child: Row(
         children: [
           Text(
             _sectionTitles[_selectedIndex],
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
           const Spacer(),
@@ -168,13 +168,13 @@ class _AdminShellPageState extends State<AdminShellPage> {
             selector: (_, p) => p.adminName,
             builder: (_, name, __) => Row(
               children: [
-                const Icon(Icons.account_circle_outlined,
-                    size: 20, color: AppColors.textSecondary),
+                Icon(Icons.account_circle_outlined,
+                    size: 20, color: AppColors.of(context).textSecondary),
                 const SizedBox(width: 6),
                 Text(
                   name,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary),
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.of(context).textSecondary),
                 ),
               ],
             ),
@@ -185,8 +185,8 @@ class _AdminShellPageState extends State<AdminShellPage> {
             icon: const Icon(Icons.logout, size: 16),
             label: const Text('Cerrar sesión'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              side: const BorderSide(color: AppColors.border),
+              foregroundColor: AppColors.of(context).textSecondary,
+              side: BorderSide(color: AppColors.of(context).border),
               textStyle: const TextStyle(fontSize: 13),
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -204,7 +204,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+      MaterialPageRoute(builder: (_) => AdminLoginPage()),
       (_) => false,
     );
   }
@@ -238,7 +238,7 @@ class _NavItem extends StatelessWidget {
     Widget iconWidget = Icon(
       selected ? selectedIcon : icon,
       size: 20,
-      color: selected ? AppColors.primary : AppColors.textSecondary,
+      color: selected ? AppColors.of(context).primary : AppColors.of(context).textSecondary,
     );
 
     if (badgeCount > 0) {
@@ -247,7 +247,7 @@ class _NavItem extends StatelessWidget {
           '$badgeCount',
           style: const TextStyle(fontSize: 10, color: Colors.white),
         ),
-        backgroundColor: AppColors.error,
+        backgroundColor: AppColors.of(context).error,
         child: iconWidget,
       );
     }
@@ -260,7 +260,7 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.primary.withValues(alpha: 0.1)
+              ? AppColors.of(context).primary.withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -275,7 +275,7 @@ class _NavItem extends StatelessWidget {
                 fontWeight:
                     selected ? FontWeight.w600 : FontWeight.normal,
                 color:
-                    selected ? AppColors.primary : AppColors.textSecondary,
+                    selected ? AppColors.of(context).primary : AppColors.of(context).textSecondary,
               ),
             ),
           ],

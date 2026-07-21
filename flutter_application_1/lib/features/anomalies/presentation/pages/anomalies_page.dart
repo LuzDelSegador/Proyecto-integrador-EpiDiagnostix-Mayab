@@ -10,13 +10,13 @@ import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
-import '../../../patients/presentation/pages/new_patient_selection_page.dart';
+import '../../../patients/presentation/widgets/add_case_choice_sheet.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 import '../../data/anomaly_service.dart';
 
 class AnomaliesPage extends StatefulWidget {
-  const AnomaliesPage({super.key});
+  AnomaliesPage({super.key});
 
   @override
   State<AnomaliesPage> createState() => _AnomaliesPageState();
@@ -37,7 +37,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   int _anomaliasAyer = 0;
   double _confianzaPromedio = 0.0;
   String _nivelAlerta = 'BAJO';
-  Color _nivelAlertaColor = AppColors.success;
+  Color _nivelAlertaColor = Color(0xFF10B981);
   double _progresoAlerta = 0.2;
 
   @override
@@ -45,7 +45,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     super.initState();
     _loadData();
     _refreshTimer =
-        Timer.periodic(const Duration(minutes: 5), (_) => _loadData());
+        Timer.periodic(Duration(minutes: 5), (_) => _loadData());
   }
 
   @override
@@ -83,7 +83,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   void _computeStats(List<AnomalyResult> results) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
+    final yesterday = today.subtract(Duration(days: 1));
 
     int hoy = 0, ayer = 0;
     double totalConfianza = 0;
@@ -107,15 +107,15 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     double progreso;
     if (hoy >= 6) {
       nivel = 'ALTO';
-      color = AppColors.error;
+      color = AppColors.of(context).error;
       progreso = 0.9;
     } else if (hoy >= 3) {
       nivel = 'MODERADO';
-      color = const Color(0xFFD97706);
+      color = Color(0xFFD97706);
       progreso = 0.6;
     } else {
       nivel = 'BAJO';
-      color = AppColors.success;
+      color = AppColors.of(context).success;
       progreso = 0.2;
     }
 
@@ -159,25 +159,25 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Detalles de inferencia'),
+        title: Text('Detalles de inferencia'),
         content: SingleChildScrollView(
           child: detailEntries.isEmpty
-              ? const Text('Sin datos adicionales disponibles.')
+              ? Text('Sin datos adicionales disponibles.')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: detailEntries.entries
                       .map(
                         (e) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          padding: EdgeInsets.symmetric(vertical: 3),
                           child: RichText(
                             text: TextSpan(
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: Colors.black87, fontSize: 13),
                               children: [
                                 TextSpan(
                                   text: '${e.key}: ',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontWeight: FontWeight.bold),
                                 ),
                                 TextSpan(text: e.value),
@@ -192,7 +192,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
+            child: Text('Cerrar'),
           ),
         ],
       ),
@@ -203,27 +203,27 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reportar a Central'),
+        title: Text('Reportar a Central'),
         content: Text('¿Confirmar reporte de "$disease" detectado en $location?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: AppColors.of(context).error,
             ),
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text('Reporte enviado a Central exitosamente'),
-                  backgroundColor: AppColors.success,
+                  backgroundColor: AppColors.of(context).success,
                 ),
               );
             },
-            child: const Text(
+            child: Text(
               'Confirmar',
               style: TextStyle(color: Colors.white),
             ),
@@ -241,7 +241,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     final bloqueado = role == UserRole.usuario;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -254,26 +254,26 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                     description:
                         'El motor de IA detecta brotes y anomalías epidemiológicas en tiempo real. Disponible desde el plan Intermedio.',
                     onVerPlanes: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const PlanesPage()),
+                      MaterialPageRoute(builder: (_) => PlanesPage()),
                     ),
                   )
                 : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildPageHeader(),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         _buildStatsRow(),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _buildConfidenceCard(),
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                         _buildDetectionsHeader(),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _buildDetectionsBody(),
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                         _buildSpatialAnalysis(),
-                        const SizedBox(height: 90),
+                        SizedBox(height: 90),
                       ],
                     ),
                   ),
@@ -283,13 +283,10 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
       floatingActionButton: bloqueado
           ? null
           : FloatingActionButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const NewPatientSelectionPage()),
-              ),
-              backgroundColor: AppColors.primary,
+              onPressed: () => showAddCaseChoiceSheet(context),
+              backgroundColor: AppColors.of(context).primary,
               elevation: 4,
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
+              child: Icon(Icons.add, color: Colors.white, size: 28),
             ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -299,23 +296,22 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
-        icon: const Icon(Icons.account_circle_outlined,
-            color: AppColors.textPrimary, size: 26),
+        icon: Icon(Icons.account_circle_outlined,
+            color: AppColors.of(context).textPrimary, size: 26),
         onPressed: () {
           context.read<AuthProvider>().resetStatus();
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
+            MaterialPageRoute(builder: (_) => LoginPage()),
           );
         },
       ),
-      title: const Text(
-        'EpiSurveillance',
+      title: Text(
+        'EpiDiagnostix-Mayab',
         style: TextStyle(
-          color: AppColors.primary,
+          color: AppColors.of(context).primary,
           fontWeight: FontWeight.bold,
           fontSize: 20,
           letterSpacing: 0.2,
@@ -323,8 +319,8 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.cloud_outlined,
-              color: AppColors.textSecondary, size: 22),
+          icon: Icon(Icons.cloud_outlined,
+              color: AppColors.of(context).textSecondary, size: 22),
           onPressed: _loadData,
         ),
       ],
@@ -336,32 +332,32 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   Widget _buildSyncBanner() {
     final auth = context.read<AuthProvider>();
     final firstName = auth.currentUser.name.split(' ').first;
-    final dotColor = _error != null ? AppColors.error : AppColors.success;
+    final dotColor = _error != null ? AppColors.of(context).error : AppColors.of(context).success;
     final syncText = _ultimaSincronizacion == null
         ? 'Sin sincronizar'
         : 'Sincronizado: ${_formatRelative(_ultimaSincronizacion!)}';
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.of(context).surface,
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           Icon(Icons.circle, color: dotColor, size: 8),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(
             syncText,
             style:
-                const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
           ),
-          const SizedBox(width: 10),
-          Container(width: 1, height: 12, color: const Color(0xFFE5E7EB)),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
+          Container(width: 1, height: 12, color: Color(0xFFE5E7EB)),
+          SizedBox(width: 10),
           Text(
             '$firstName - ACTIVO',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: AppColors.primary,
+              color: AppColors.of(context).primary,
               letterSpacing: 0.4,
             ),
           ),
@@ -373,7 +369,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   // ── Page header ───────────────────────────────────────────────────────────
 
   Widget _buildPageHeader() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -381,7 +377,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
         SizedBox(height: 4),
@@ -389,7 +385,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           'Detecciones inusuales identificadas por el motor de IA.',
           style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             height: 1.4,
           ),
         ),
@@ -403,7 +399,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     return Row(
       children: [
         Expanded(child: _buildAnomaliesCard()),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(child: _buildAlertCard()),
       ],
     );
@@ -412,52 +408,52 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
   Widget _buildAnomaliesCard() {
     final diff = _anomaliasHoy - _anomaliasAyer;
     final trendText = diff >= 0 ? '+$diff' : '$diff';
-    final trendColor = diff > 0 ? AppColors.error : AppColors.success;
+    final trendColor = diff > 0 ? AppColors.of(context).error : AppColors.of(context).success;
     final trendIcon =
         diff > 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'ANOMALÍAS HOY',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '$_anomaliasHoy',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                   height: 1,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 decoration: BoxDecoration(
                   color: trendColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(6),
@@ -466,7 +462,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(trendIcon, color: trendColor, size: 12),
-                    const SizedBox(width: 2),
+                    SizedBox(width: 2),
                     Text(
                       trendText,
                       style: TextStyle(
@@ -487,41 +483,41 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   Widget _buildAlertCard() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'NIVEL ALERTA GLOBAL',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: _progresoAlerta,
               minHeight: 8,
-              backgroundColor: const Color(0xFFF3F4F6),
+              backgroundColor: Color(0xFFF3F4F6),
               valueColor: AlwaysStoppedAnimation<Color>(_nivelAlertaColor),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
             child: Text(
@@ -545,10 +541,10 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     final pct = _confianzaPromedio.toStringAsFixed(1);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [Color(0xFF1B6E52), Color(0xFF0D4A38)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -569,21 +565,21 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
                       '$pct%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         height: 1,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.verified_outlined,
+                    SizedBox(width: 8),
+                    Icon(Icons.verified_outlined,
                         color: Colors.white70, size: 20),
                   ],
                 ),
@@ -597,7 +593,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
               color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.shield_outlined,
+            child: Icon(Icons.shield_outlined,
                 color: Colors.white, size: 24),
           ),
         ],
@@ -611,24 +607,24 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'Detecciones Recientes',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
         GestureDetector(
           onTap: _loadData,
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.refresh_rounded, color: AppColors.primary, size: 16),
+              Icon(Icons.refresh_rounded, color: AppColors.of(context).primary, size: 16),
               SizedBox(width: 4),
               Text(
                 'Actualizar',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.of(context).primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -644,7 +640,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   Widget _buildDetectionsBody() {
     if (_loading && _historial.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -666,7 +662,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
       children: anomalias
           .map(
             (r) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: 12),
               child: _buildDetectionCardFromResult(r),
             ),
           )
@@ -676,26 +672,26 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   Widget _buildErrorCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.08),
+        color: AppColors.of(context).error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.of(context).error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.cloud_off_outlined,
-              color: AppColors.error, size: 20),
-          const SizedBox(width: 12),
+          Icon(Icons.cloud_off_outlined,
+              color: AppColors.of(context).error, size: 20),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
               _error!,
-              style: const TextStyle(color: AppColors.error, fontSize: 13),
+              style: TextStyle(color: AppColors.of(context).error, fontSize: 13),
             ),
           ),
           TextButton(
             onPressed: _loadData,
-            child: const Text('Reintentar'),
+            child: Text('Reintentar'),
           ),
         ],
       ),
@@ -704,17 +700,17 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 
   Widget _buildEmptyCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.08),
+        color: AppColors.of(context).success.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border:
-            Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            Border.all(color: AppColors.of(context).success.withValues(alpha: 0.3)),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(Icons.check_circle_outline,
-              color: AppColors.success, size: 24),
+              color: AppColors.of(context).success, size: 24),
           SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -723,7 +719,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 Text(
                   'Sin anomalías detectadas',
                   style: TextStyle(
-                    color: AppColors.success,
+                    color: AppColors.of(context).success,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -732,7 +728,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 Text(
                   'El sistema está monitoreando activamente sin detectar patrones anómalos.',
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: AppColors.of(context).textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -778,18 +774,18 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           ? Icons.coronavirus_outlined
           : Icons.warning_amber_outlined,
       iconBg: isCritico
-          ? const Color(0xFFFFE4E4)
-          : const Color(0xFFFEF3C7),
-      iconColor: isCritico ? AppColors.error : const Color(0xFFD97706),
+          ? Color(0xFFFFE4E4)
+          : Color(0xFFFEF3C7),
+      iconColor: isCritico ? AppColors.of(context).error : Color(0xFFD97706),
       disease: titulo,
       badge: isCritico ? 'CRÍTICO' : 'ADVERTENCIA',
-      badgeColor: isCritico ? AppColors.error : const Color(0xFFD97706),
+      badgeColor: isCritico ? AppColors.of(context).error : Color(0xFFD97706),
       location: ubicacion,
       cases: cases,
       time: _formatRelative(r.createdAt),
       confidence: confianza,
       actionLabel: isCritico ? 'Reportar a Central' : 'Ver detalles',
-      actionBg: isCritico ? AppColors.error : AppColors.primary,
+      actionBg: isCritico ? AppColors.of(context).error : AppColors.of(context).primary,
       actionFg: Colors.white,
       onAction: isCritico
           ? () => _showReportDialog(titulo, ubicacion)
@@ -819,15 +815,15 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     VoidCallback? onViewDetail,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -847,22 +843,22 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                 ),
                 child: Icon(icon, color: iconColor, size: 22),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       disease,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: AppColors.of(context).textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(
+                      padding: EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: badgeColor,
@@ -870,7 +866,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                       ),
                       child: Text(
                         badge,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -883,64 +879,64 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           // Location
           Row(
             children: [
-              const Icon(Icons.location_on_outlined,
-                  color: AppColors.textMuted, size: 14),
-              const SizedBox(width: 4),
+              Icon(Icons.location_on_outlined,
+                  color: AppColors.of(context).textMuted, size: 14),
+              SizedBox(width: 4),
               Text(
                 location,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.of(context).textSecondary),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           // Cases + time
           Row(
             children: [
-              const Icon(Icons.fingerprint_outlined,
-                  color: AppColors.textMuted, size: 14),
-              const SizedBox(width: 4),
+              Icon(Icons.fingerprint_outlined,
+                  color: AppColors.of(context).textMuted, size: 14),
+              SizedBox(width: 4),
               Text(
                 cases,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.of(context).textSecondary),
               ),
-              const SizedBox(width: 12),
-              const Icon(Icons.access_time_rounded,
-                  color: AppColors.textMuted, size: 14),
-              const SizedBox(width: 4),
+              SizedBox(width: 12),
+              Icon(Icons.access_time_rounded,
+                  color: AppColors.of(context).textMuted, size: 14),
+              SizedBox(width: 4),
               Text(
                 time,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.of(context).textSecondary),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           // Confidence
           RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 12),
               children: [
-                const TextSpan(
+                TextSpan(
                   text: 'IA Confianza: ',
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.of(context).textMuted),
                 ),
                 TextSpan(
                   text: '$confidence%',
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: AppColors.of(context).primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           // Action row
           Row(
             children: [
@@ -955,7 +951,7 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                     side: actionBorder != null
                         ? BorderSide(color: actionBorder, width: 1.2)
                         : BorderSide.none,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: EdgeInsets.symmetric(horizontal: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -970,18 +966,18 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               GestureDetector(
                 onTap: onViewDetail,
                 child: Container(
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    border: Border.all(color: Color(0xFFE5E7EB)),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.remove_red_eye_outlined,
-                      color: AppColors.textMuted, size: 18),
+                  child: Icon(Icons.remove_red_eye_outlined,
+                      color: AppColors.of(context).textMuted, size: 18),
                 ),
               ),
             ],
@@ -997,45 +993,45 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Análisis Espacial de Brotes',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
+        SizedBox(height: 4),
+        Text(
           'Visualización en tiempo real del Distrito 7. Las áreas en rojo muestran una densidad de infección mayor al promedio histórico.',
           style: TextStyle(
             fontSize: 12,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 10),
-        const Row(
+        SizedBox(height: 10),
+        Row(
           children: [
             Icon(Icons.my_location_rounded,
-                color: AppColors.primary, size: 14),
+                color: AppColors.of(context).primary, size: 14),
             SizedBox(width: 6),
             Text(
               'Foco Detectado',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
               ),
             ),
             SizedBox(width: 8),
             Text(
               'Radio de 2km en expansión',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: AppColors.of(context).textSecondary),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
@@ -1044,10 +1040,10 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
             child: Stack(
               children: [
                 CustomPaint(
-                  size: const Size(double.infinity, 180),
+                  size: Size(double.infinity, 180),
                   painter: _HeatMapPainter(),
                 ),
-                const Positioned(
+                Positioned(
                   bottom: 10,
                   right: 10,
                   child: _LiveBadge(),
@@ -1070,33 +1066,32 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
           Navigator.of(context).popUntil((route) => route.isFirst);
         } else if (i == 2) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const CasosPage()),
+            MaterialPageRoute(builder: (_) => CasosPage()),
           );
         } else if (i == 3) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MapaPage()),
+            MaterialPageRoute(builder: (_) => MapaPage()),
           );
         } else if (i == 4) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServiciosPage()),
+            MaterialPageRoute(builder: (_) => ServiciosPage()),
           );
         } else {
           setState(() => _currentNavIndex = i);
         }
       },
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textMuted,
-      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.of(context).primary,
+      unselectedItemColor: AppColors.of(context).textMuted,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle:
-          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 10),
+          TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 10),
       elevation: 10,
-      items: const [
+      items: [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
           activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          label: 'Inicio',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.warning_amber_outlined),
@@ -1126,23 +1121,23 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
 // ── Live GPS badge ────────────────────────────────────────────────────────────
 
 class _LiveBadge extends StatelessWidget {
-  const _LiveBadge();
+  _LiveBadge();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.success,
+        color: AppColors.of(context).success,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.circle, color: Colors.white, size: 6),
           SizedBox(width: 4),
           Text(
-            'LIVE GPS FEED',
+            'GPS EN VIVO',
             style: TextStyle(
               color: Colors.white,
               fontSize: 9,
@@ -1164,7 +1159,7 @@ class _HeatMapPainter extends CustomPainter {
     // Dark background
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFF080C10),
+      Paint()..color = Color(0xFF080C10),
     );
 
     void drawBlob(double cx, double cy, double r, List<Color> colors,
@@ -1178,60 +1173,60 @@ class _HeatMapPainter extends CustomPainter {
 
     // Green blobs (cool — outer areas)
     drawBlob(0.15, 0.6, 55, [
-      const Color(0xFF00CC44).withValues(alpha: 0.7),
-      const Color(0xFF00AA33).withValues(alpha: 0.3),
+      Color(0xFF00CC44).withValues(alpha: 0.7),
+      Color(0xFF00AA33).withValues(alpha: 0.3),
       Colors.transparent,
-    ], const [0.0, 0.5, 1.0]);
+    ], [0.0, 0.5, 1.0]);
 
     drawBlob(0.82, 0.35, 40, [
-      const Color(0xFF22BB55).withValues(alpha: 0.6),
-      const Color(0xFF008833).withValues(alpha: 0.2),
+      Color(0xFF22BB55).withValues(alpha: 0.6),
+      Color(0xFF008833).withValues(alpha: 0.2),
       Colors.transparent,
-    ], const [0.0, 0.55, 1.0]);
+    ], [0.0, 0.55, 1.0]);
 
     drawBlob(0.72, 0.75, 35, [
-      const Color(0xFF33CC44).withValues(alpha: 0.5),
+      Color(0xFF33CC44).withValues(alpha: 0.5),
       Colors.transparent,
-    ], const [0.0, 1.0]);
+    ], [0.0, 1.0]);
 
     // Yellow blobs (warm)
     drawBlob(0.4, 0.5, 60, [
-      const Color(0xFFFFDD00).withValues(alpha: 0.75),
-      const Color(0xFFFFAA00).withValues(alpha: 0.35),
+      Color(0xFFFFDD00).withValues(alpha: 0.75),
+      Color(0xFFFFAA00).withValues(alpha: 0.35),
       Colors.transparent,
-    ], const [0.0, 0.5, 1.0]);
+    ], [0.0, 0.5, 1.0]);
 
     drawBlob(0.55, 0.65, 45, [
-      const Color(0xFFFFBB00).withValues(alpha: 0.65),
-      const Color(0xFFFF8800).withValues(alpha: 0.25),
+      Color(0xFFFFBB00).withValues(alpha: 0.65),
+      Color(0xFFFF8800).withValues(alpha: 0.25),
       Colors.transparent,
-    ], const [0.0, 0.5, 1.0]);
+    ], [0.0, 0.5, 1.0]);
 
     // Orange blobs (hot)
     drawBlob(0.42, 0.42, 48, [
-      const Color(0xFFFF7700).withValues(alpha: 0.85),
-      const Color(0xFFFF4400).withValues(alpha: 0.4),
+      Color(0xFFFF7700).withValues(alpha: 0.85),
+      Color(0xFFFF4400).withValues(alpha: 0.4),
       Colors.transparent,
-    ], const [0.0, 0.5, 1.0]);
+    ], [0.0, 0.5, 1.0]);
 
     drawBlob(0.55, 0.38, 38, [
-      const Color(0xFFFF5500).withValues(alpha: 0.8),
-      const Color(0xFFFF2200).withValues(alpha: 0.3),
+      Color(0xFFFF5500).withValues(alpha: 0.8),
+      Color(0xFFFF2200).withValues(alpha: 0.3),
       Colors.transparent,
-    ], const [0.0, 0.55, 1.0]);
+    ], [0.0, 0.55, 1.0]);
 
     // Red core blobs (critical hot spots)
     drawBlob(0.44, 0.4, 30, [
-      const Color(0xFFFF1100).withValues(alpha: 0.9),
-      const Color(0xFFFF4400).withValues(alpha: 0.5),
+      Color(0xFFFF1100).withValues(alpha: 0.9),
+      Color(0xFFFF4400).withValues(alpha: 0.5),
       Colors.transparent,
-    ], const [0.0, 0.5, 1.0]);
+    ], [0.0, 0.5, 1.0]);
 
     drawBlob(0.52, 0.45, 22, [
-      const Color(0xFFFF0000),
-      const Color(0xFFFF3300).withValues(alpha: 0.5),
+      Color(0xFFFF0000),
+      Color(0xFFFF3300).withValues(alpha: 0.5),
       Colors.transparent,
-    ], const [0.0, 0.55, 1.0]);
+    ], [0.0, 0.55, 1.0]);
 
     // Subtle grid overlay
     final gridPaint = Paint()

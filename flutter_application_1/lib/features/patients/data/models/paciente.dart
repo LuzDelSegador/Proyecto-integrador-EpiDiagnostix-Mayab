@@ -8,6 +8,14 @@ class Paciente {
   final int totalVisitas;
   final bool sincronizado;
 
+  // Identidad MS1 — requeridos por POST /pacientes, capturados en el alta.
+  final String? curp;
+  final String? fechaNacimiento; // 'YYYY-MM-DD'
+  final String? municipio;
+  final String? lenguaMaterna;
+  final String? contactoEmergencia;
+  final String? remoteId; // id devuelto por MS1 una vez sincronizado
+
   const Paciente({
     required this.id,
     required this.nombreCompleto,
@@ -17,6 +25,12 @@ class Paciente {
     required this.ultimaVisita,
     required this.totalVisitas,
     this.sincronizado = false,
+    this.curp,
+    this.fechaNacimiento,
+    this.municipio,
+    this.lenguaMaterna,
+    this.contactoEmergencia,
+    this.remoteId,
   });
 }
 
@@ -44,6 +58,8 @@ class ConsultaResumen {
   final String? categoriaSintoma;
   final Map<String, dynamic> camposExtraidos;
   final bool sincronizado;
+  final double? latitud;
+  final double? longitud;
 
   const ConsultaResumen({
     required this.id,
@@ -57,5 +73,7 @@ class ConsultaResumen {
     this.categoriaSintoma,
     required this.camposExtraidos,
     this.sincronizado = false,
+    this.latitud,
+    this.longitud,
   });
 }

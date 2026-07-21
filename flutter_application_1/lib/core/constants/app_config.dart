@@ -1,7 +1,8 @@
 
-const String kBaseUrlAuth = 'http://10.105.178.83:8000';  // MS1: auth, pacientes, admin — red local
-const String kBaseUrlML   = 'http://44.206.197.26:8001';  // MS2: NER + Isolation Forest — AWS EC2
-const String kBaseUrl     = kBaseUrlAuth; // alias para compatibilidad
+const String kBaseUrlAuth     = 'https://epidiagnostic-ms-pacientes.onrender.com';       // MS1: auth, pacientes, personal, admin
+const String kBaseUrlAtencion = 'https://epidiagnostic-ms-atencion-medica.onrender.com'; // MS2: atenciones (mismo JWT que MS1)
+const String kBaseUrlML       = 'http://44.206.197.26:8001';  // Legado: NER + Isolation Forest — AWS EC2 (no confundir con MS2)
+const String kBaseUrl         = kBaseUrlAuth; // alias para compatibilidad
 
 
 const String kStripePublishableKey = 'pk_test_REEMPLAZAR_CON_CLAVE_REAL';

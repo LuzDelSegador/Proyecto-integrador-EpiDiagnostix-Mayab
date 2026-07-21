@@ -21,7 +21,7 @@ class PatientLocalRepository {
     final dbPath = await getDatabasesPath();
     return openDatabase(
       join(dbPath, _dbName),
-      version: 5,
+      version: 6,
       onCreate: (db, _) async {
         await _createPacientesTable(db);
         await _createConsultasTable(db);
@@ -35,11 +35,12 @@ class PatientLocalRepository {
           await _migrarConsultasPendientes(db);
           await db.execute('DROP TABLE IF EXISTS consultas_pendientes');
           await db.execute('DROP TABLE IF EXISTS patient_records');
-          // Salta al bloque v5 si aplica.
+          // Salta a los bloques v5/v6 si aplica.
           if (newVersion >= 5) {
             await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
             await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
           }
+          if (newVersion >= 6) await _agregarColumnasV6(db);
         } else if (oldVersion == 3) {
           // La tabla pacientes existe pero sin nombre_normalizado → ALTER + backfill.
           await db.execute(
@@ -50,25 +51,48 @@ class PatientLocalRepository {
             await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
             await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
           }
+          if (newVersion >= 6) await _agregarColumnasV6(db);
         } else if (oldVersion == 4) {
           await db.execute('ALTER TABLE $_tConsultas ADD COLUMN latitud REAL');
           await db.execute('ALTER TABLE $_tConsultas ADD COLUMN longitud REAL');
+          if (newVersion >= 6) await _agregarColumnasV6(db);
+        } else if (oldVersion == 5) {
+          await _agregarColumnasV6(db);
         }
       },
     );
   }
 
+  // Migración v5→v6: identidad de paciente para MS1 (curp, fecha_nacimiento,
+  // municipio, lengua_materna, contacto_emergencia) + remote_id de outbox
+  // en ambas tablas para el sync contra MS1/MS2.
+  Future<void> _agregarColumnasV6(Database db) async {
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN curp TEXT');
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN fecha_nacimiento TEXT');
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN municipio TEXT');
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN lengua_materna TEXT');
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN contacto_emergencia TEXT');
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN remote_id TEXT');
+    await db.execute('ALTER TABLE $_tConsultas ADD COLUMN remote_id TEXT');
+  }
+
   Future<void> _createPacientesTable(Database db) => db.execute('''
     CREATE TABLE IF NOT EXISTS $_tPacientes (
-      id                  TEXT    PRIMARY KEY,
-      nombre_completo     TEXT    NOT NULL,
-      nombre_normalizado  TEXT,
-      sexo                TEXT,
-      comunidad           TEXT,
-      primera_visita      TEXT    NOT NULL,
-      ultima_visita       TEXT    NOT NULL,
-      total_visitas       INTEGER NOT NULL DEFAULT 1,
-      sincronizado        INTEGER NOT NULL DEFAULT 0
+      id                   TEXT    PRIMARY KEY,
+      nombre_completo      TEXT    NOT NULL,
+      nombre_normalizado   TEXT,
+      sexo                 TEXT,
+      comunidad            TEXT,
+      primera_visita       TEXT    NOT NULL,
+      ultima_visita        TEXT    NOT NULL,
+      total_visitas        INTEGER NOT NULL DEFAULT 1,
+      sincronizado         INTEGER NOT NULL DEFAULT 0,
+      curp                 TEXT,
+      fecha_nacimiento     TEXT,
+      municipio            TEXT,
+      lengua_materna       TEXT,
+      contacto_emergencia  TEXT,
+      remote_id            TEXT
     )
   ''');
 
@@ -82,7 +106,8 @@ class PatientLocalRepository {
       sincronizado       INTEGER NOT NULL DEFAULT 0,
       fecha_sincronizado TEXT,
       latitud            REAL,
-      longitud           REAL
+      longitud           REAL,
+      remote_id          TEXT
     )
   ''');
 
@@ -154,72 +179,65 @@ class PatientLocalRepository {
 
   // ── API pública ────────────────────────────────────────────────────────────
 
-  /// Busca por nombre_normalizado (sin acentos, minúsculas). Si existe actualiza
-  /// ultima_visita y total_visitas. Si no existe, crea el paciente.
-  Future<Paciente> buscarOCrearPaciente(
-    String nombreCompleto,
-    String? sexo,
+  /// Alta/identidad de paciente para MS1: busca por CURP (no por nombre). Si
+  /// ya existe localmente devuelve el registro tal cual (la identidad no se
+  /// pisa aquí — para eso está actualizarDatosPaciente). Si no existe, lo crea.
+  Future<Paciente> crearOEncontrarPacientePorCurp({
+    required String curp,
+    required String nombreCompleto,
+    required String fechaNacimiento,
+    required String sexo,
     String? comunidad,
-  ) async {
-    final db   = await _database;
-    final norm = _normAcentos(nombreCompleto);
-    final ahora    = DateTime.now();
-    final ahoraIso = ahora.toIso8601String();
+    required String municipio,
+    String? lenguaMaterna,
+    String? contactoEmergencia,
+  }) async {
+    final db = await _database;
+    final curpNorm = curp.trim().toUpperCase();
 
     final rows = await db.query(
       _tPacientes,
-      where:     'nombre_normalizado = ?',
-      whereArgs: [norm],
+      where:     'curp = ?',
+      whereArgs: [curpNorm],
       limit:     1,
     );
+    if (rows.isNotEmpty) return _pacienteFromRow(rows.first);
 
-    if (rows.isNotEmpty) {
-      final m = rows.first;
-      final nuevasVisitas = (m['total_visitas'] as int) + 1;
-      await db.update(
-        _tPacientes,
-        {'ultima_visita': ahoraIso, 'total_visitas': nuevasVisitas},
-        where:     'id = ?',
-        whereArgs: [m['id']],
-      );
-      return Paciente(
-        id:             m['id'] as String,
-        nombreCompleto: m['nombre_completo'] as String,
-        sexo:           m['sexo'] as String?,
-        comunidad:      m['comunidad'] as String?,
-        primeraVisita:  DateTime.parse(m['primera_visita'] as String),
-        ultimaVisita:   ahora,
-        totalVisitas:   nuevasVisitas,
-        sincronizado:   (m['sincronizado'] as int) == 1,
-      );
-    }
-
-    final id = const Uuid().v4();
+    final id      = const Uuid().v4();
+    final ahoraIso = DateTime.now().toIso8601String();
     final comunidadVal =
         (comunidad == null || comunidad.trim().isEmpty) ? null : comunidad.trim();
-    await db.insert(_tPacientes, {
-      'id':                 id,
-      'nombre_completo':    nombreCompleto,
-      'nombre_normalizado': norm,
-      'sexo':               sexo,
-      'comunidad':          comunidadVal,
-      'primera_visita':     ahoraIso,
-      'ultima_visita':      ahoraIso,
-      'total_visitas':      1,
-      'sincronizado':       0,
-    });
-    return Paciente(
-      id:             id,
-      nombreCompleto: nombreCompleto,
-      sexo:           sexo,
-      comunidad:      comunidadVal,
-      primeraVisita:  ahora,
-      ultimaVisita:   ahora,
-      totalVisitas:   1,
-    );
+    final row = {
+      'id':                  id,
+      'nombre_completo':     nombreCompleto,
+      'nombre_normalizado':  _normAcentos(nombreCompleto),
+      'sexo':                sexo,
+      'comunidad':           comunidadVal,
+      'primera_visita':      ahoraIso,
+      'ultima_visita':       ahoraIso,
+      'total_visitas':       0,
+      'sincronizado':        0,
+      'curp':                curpNorm,
+      'fecha_nacimiento':    fechaNacimiento,
+      'municipio':           municipio,
+      'lengua_materna':      lenguaMaterna,
+      'contacto_emergencia': contactoEmergencia,
+      'remote_id':           null,
+    };
+    await db.insert(_tPacientes, row);
+    return _pacienteFromRow(row);
   }
 
-  /// Guarda una consulta vinculada al paciente. Devuelve el UUID generado.
+  Future<Paciente?> obtenerPorId(String id) async {
+    final db = await _database;
+    final rows = await db.query(_tPacientes, where: 'id = ?', whereArgs: [id], limit: 1);
+    if (rows.isEmpty) return null;
+    return _pacienteFromRow(rows.first);
+  }
+
+  /// Guarda una consulta vinculada al paciente y registra la visita
+  /// (incrementa total_visitas / actualiza ultima_visita del paciente).
+  /// Devuelve el UUID local generado.
   Future<String> guardarConsulta(String pacienteId, PatientRecord record) async {
     final db = await _database;
     final id = const Uuid().v4();
@@ -228,8 +246,105 @@ class PatientLocalRepository {
       'paciente_id': pacienteId,
       ...record.toMap(),
     });
+    await db.rawUpdate(
+      'UPDATE $_tPacientes SET total_visitas = total_visitas + 1, ultima_visita = ? WHERE id = ?',
+      [record.fechaCaptura.toIso8601String(), pacienteId],
+    );
     return id;
   }
+
+  /// Marca un paciente local como sincronizado y guarda el id que devolvió MS1.
+  Future<void> marcarPacienteSincronizado(String localId, String remoteId) async {
+    final db = await _database;
+    await db.update(
+      _tPacientes,
+      {'sincronizado': 1, 'remote_id': remoteId},
+      where:     'id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  /// Marca una consulta local como sincronizada y guarda el id que devolvió MS2.
+  Future<void> marcarConsultaSincronizada(String localId, String remoteId) async {
+    final db = await _database;
+    await db.update(
+      _tConsultas,
+      {
+        'sincronizado':       1,
+        'remote_id':          remoteId,
+        'fecha_sincronizado': DateTime.now().toIso8601String(),
+      },
+      where:     'id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  /// Pacientes con identidad completa (curp no nulo) pendientes de subir a MS1.
+  Future<List<Paciente>> getPacientesPendientesSync() async {
+    final db = await _database;
+    final rows = await db.query(
+      _tPacientes,
+      where:     'sincronizado = 0 AND curp IS NOT NULL',
+      whereArgs: [],
+    );
+    return rows.map(_pacienteFromRow).toList();
+  }
+
+  /// Consultas pendientes cuyo paciente YA tiene remote_id (MS2 necesita el
+  /// paciente_id real del backend, no el id local).
+  Future<List<Map<String, dynamic>>> getConsultasPendientesSync() async {
+    final db = await _database;
+    return db.rawQuery('''
+      SELECT c.*, p.remote_id AS paciente_remote_id
+      FROM $_tConsultas c
+      JOIN $_tPacientes p ON p.id = c.paciente_id
+      WHERE c.sincronizado = 0 AND p.remote_id IS NOT NULL
+    ''');
+  }
+
+  /// Progreso real de sincronización de consultas: total capturadas en este
+  /// dispositivo vs. cuántas ya subieron a MS2. Reemplaza el "82/87" fijo del
+  /// dashboard — cuenta directamente sobre SQLite, sin llamar a la red.
+  Future<SyncStats> getConsultasSyncStats() async {
+    final db = await _database;
+    final totalRow = await db.rawQuery('SELECT COUNT(*) AS c FROM $_tConsultas');
+    final syncRow = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $_tConsultas WHERE sincronizado = 1',
+    );
+    return SyncStats(
+      total: totalRow.first['c'] as int,
+      sincronizadas: syncRow.first['c'] as int,
+    );
+  }
+
+  /// Cuenta consultas capturadas en la ventana [desde, hasta). Se usa dos
+  /// veces desde el dashboard (últimas 24h y las 24h previas) para armar el
+  /// indicador "Casos Nuevos (24h)" con su comparación vs. período anterior.
+  Future<int> contarConsultasEntre(DateTime desde, DateTime hasta) async {
+    final db = await _database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $_tConsultas WHERE fecha_captura >= ? AND fecha_captura < ?',
+      [desde.toIso8601String(), hasta.toIso8601String()],
+    );
+    return rows.first['c'] as int;
+  }
+
+  Paciente _pacienteFromRow(Map<String, dynamic> r) => Paciente(
+        id:                 r['id'] as String,
+        nombreCompleto:     r['nombre_completo'] as String,
+        sexo:               r['sexo'] as String?,
+        comunidad:          r['comunidad'] as String?,
+        primeraVisita:      DateTime.parse(r['primera_visita'] as String),
+        ultimaVisita:       DateTime.parse(r['ultima_visita'] as String),
+        totalVisitas:       r['total_visitas'] as int,
+        sincronizado:       (r['sincronizado'] as int) == 1,
+        curp:               r['curp'] as String?,
+        fechaNacimiento:    r['fecha_nacimiento'] as String?,
+        municipio:          r['municipio'] as String?,
+        lenguaMaterna:      r['lengua_materna'] as String?,
+        contactoEmergencia: r['contacto_emergencia'] as String?,
+        remoteId:           r['remote_id'] as String?,
+      );
 
   /// Devuelve todos los pacientes ordenados por ultima_visita DESC.
   /// Si [filtroNombre] no es null, aplica LIKE sobre nombre_normalizado
@@ -260,16 +375,7 @@ class PatientLocalRepository {
 
     final rows = await db.rawQuery(sql, args);
     return rows.map((r) => PacienteConResumen(
-      paciente: Paciente(
-        id:             r['id'] as String,
-        nombreCompleto: r['nombre_completo'] as String,
-        sexo:           r['sexo'] as String?,
-        comunidad:      r['comunidad'] as String?,
-        primeraVisita:  DateTime.parse(r['primera_visita'] as String),
-        ultimaVisita:   DateTime.parse(r['ultima_visita'] as String),
-        totalVisitas:   r['total_visitas'] as int,
-        sincronizado:   (r['sincronizado'] as int) == 1,
-      ),
+      paciente: _pacienteFromRow(r),
       visitasEstaSemana: r['visitas_esta_semana'] as int,
       visitasEsteMes:    r['visitas_este_mes'] as int,
     )).toList();
@@ -304,6 +410,8 @@ class PatientLocalRepository {
         categoriaSintoma:  campos['categoria_sintoma'] as String?,
         camposExtraidos:   campos,
         sincronizado:      (r['sincronizado'] as int) == 1,
+        latitud:           _toDouble(r['latitud']),
+        longitud:          _toDouble(r['longitud']),
       );
     }).toList();
   }
@@ -333,4 +441,13 @@ class PatientLocalRepository {
 
   static int? _toInt(dynamic v) =>
       v == null ? null : int.tryParse(v.toString());
+}
+
+class SyncStats {
+  final int total;
+  final int sincronizadas;
+
+  const SyncStats({required this.total, required this.sincronizadas});
+
+  double get progreso => total == 0 ? 1.0 : sincronizadas / total;
 }

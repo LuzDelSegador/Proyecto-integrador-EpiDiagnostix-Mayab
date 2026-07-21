@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../core/constants/app_config.dart';
+import '../../auth/data/models/auth_model.dart';
 
 class SolicitudResult {
   final String solicitudId;
@@ -62,5 +63,23 @@ class PlanService {
       if (e.response?.statusCode == 404) return null;
       rethrow;
     }
+  }
+
+  /// PATCH /auth/upgrade-plan — sube de plan (usuario -> enfermera -> medico,
+  /// nunca baja), devuelve un JWT nuevo con el tipo actualizado. Sin trigger
+  /// de UI todavía: ningún flujo actual lo dispara, queda listo para cuando
+  /// se defina dónde debe vivir (ej. tras aprobación de la solicitud premium).
+  Future<AuthModel> upgradePlan({
+    required String nuevoTipo,
+    bool cedulaVerificada = false,
+  }) async {
+    final response = await _dio.patch(
+      '$kBaseUrlAuth/auth/upgrade-plan',
+      data: {
+        'nuevo_tipo': nuevoTipo,
+        'cedula_verificada': cedulaVerificada,
+      },
+    );
+    return AuthModel.fromJson(response.data as Map<String, dynamic>);
   }
 }
