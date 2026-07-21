@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/app_config.dart';
+import 'core/constants/app_theme.dart';
 import 'core/di/injection_container.dart' as di;
 import 'core/services/token_storage.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -22,19 +23,19 @@ void main() async {
   await di.sl.allReady();
   // Precarga el token en _cachedToken para que el interceptor Dio lo lea.
   final startWithDashboard = await di.sl<TokenStorage>().hasToken();
-  runApp(EpiSurveillanceApp(startWithDashboard: startWithDashboard));
+  runApp(EpiDiagnostixMayabApp(startWithDashboard: startWithDashboard));
 }
 
-class EpiSurveillanceApp extends StatefulWidget {
+class EpiDiagnostixMayabApp extends StatefulWidget {
   final bool startWithDashboard;
 
-  const EpiSurveillanceApp({super.key, required this.startWithDashboard});
+  const EpiDiagnostixMayabApp({super.key, required this.startWithDashboard});
 
   @override
-  State<EpiSurveillanceApp> createState() => _EpiSurveillanceAppState();
+  State<EpiDiagnostixMayabApp> createState() => _EpiDiagnostixMayabAppState();
 }
 
-class _EpiSurveillanceAppState extends State<EpiSurveillanceApp> {
+class _EpiDiagnostixMayabAppState extends State<EpiDiagnostixMayabApp> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   @override
@@ -60,14 +61,12 @@ class _EpiSurveillanceAppState extends State<EpiSurveillanceApp> {
     return ChangeNotifierProvider(
       create: (_) => di.sl<AuthProvider>(),
       child: MaterialApp(
-        title: 'EpiSurveillance',
+        title: 'EpiDiagnostix-Mayab',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B6E52)),
-          fontFamily: 'Roboto',
-        ),
-        home: widget.startWithDashboard ? const DashboardPage() : const LoginPage(),
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.system,
+        home: widget.startWithDashboard ? DashboardPage() : LoginPage(),
       ),
     );
   }

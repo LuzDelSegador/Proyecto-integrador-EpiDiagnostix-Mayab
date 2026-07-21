@@ -1,16 +1,34 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
+import '../../../attentions/data/datasources/atencion_remote_datasource.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
-import '../../../patients/presentation/pages/patient_registration_page.dart';
+import '../../../patients/data/datasources/paciente_remote_datasource.dart';
+import '../../../patients/data/repositories/patient_local_repository.dart';
+import '../../../patients/presentation/widgets/add_case_choice_sheet.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 import '../../../sync/data/sync_service.dart';
 
+class _PacienteReciente {
+  final String nombre;
+  final DateTime ultimaAtencion;
+  final bool pendienteSync;
+
+  const _PacienteReciente({
+    required this.nombre,
+    required this.ultimaAtencion,
+    required this.pendienteSync,
+  });
+}
+
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  DashboardPage({super.key});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -20,12 +38,130 @@ class _DashboardPageState extends State<DashboardPage> {
   int _currentNavIndex = 0;
   bool _sincronizando = false;
 
+  // ── Estadísticas reales (SQLite local, sin datos simulados) ────────────────
+  SyncStats? _syncStats;
+  int _nuevosCasos24h = 0;
+  int _casosPeriodoPrevio = 0;
+  bool _loadingStats = true;
+
+  // ── Mis Pacientes ────────────────────────────────────────────────────────
+  List<_PacienteReciente> _misPacientes = [];
+  bool _loadingPacientes = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+    _loadMisPacientes();
+  }
+
+  Future<void> _loadMisPacientes() async {
+    final personalId = context.read<AuthProvider>().currentUser.userId;
+    List<_PacienteReciente> entries = [];
+
+    try {
+      final resultados = await Connectivity().checkConnectivity();
+      final online = resultados.any((r) => r != ConnectivityResult.none);
+      if (online && personalId.isNotEmpty) {
+        entries = await _cargarPacientesRemoto(personalId);
+      }
+    } catch (_) {
+      entries = [];
+    }
+
+    // Sin conexión, sin resultados remotos, o falló la llamada: se cae a lo
+    // que ya está en SQLite (incluye pacientes sincronizados y pendientes).
+    if (entries.isEmpty) {
+      entries = await _cargarPacientesLocal();
+    }
+
+    entries.sort((a, b) => b.ultimaAtencion.compareTo(a.ultimaAtencion));
+    if (!mounted) return;
+    setState(() {
+      _misPacientes = entries.take(5).toList();
+      _loadingPacientes = false;
+    });
+  }
+
+  /// GET /atenciones/personal/{id} solo trae paciente_id, no el nombre — se
+  /// deduplica por paciente antes de resolver cada nombre con GET
+  /// /pacientes/{id} en MS1, para no hacer una llamada por cada atención.
+  Future<List<_PacienteReciente>> _cargarPacientesRemoto(String personalId) async {
+    final atenciones = await sl<AtencionRemoteDataSource>().porPersonal(personalId);
+    if (atenciones.isEmpty) return [];
+
+    final ultimaPorPaciente = <String, DateTime>{};
+    for (final a in atenciones) {
+      final fecha = DateTime.tryParse(a.fechaAtencion) ?? DateTime.now();
+      final actual = ultimaPorPaciente[a.pacienteId];
+      if (actual == null || fecha.isAfter(actual)) {
+        ultimaPorPaciente[a.pacienteId] = fecha;
+      }
+    }
+
+    final entries = <_PacienteReciente>[];
+    for (final entry in ultimaPorPaciente.entries) {
+      try {
+        final paciente = await sl<PacienteRemoteDataSource>().obtener(entry.key);
+        entries.add(_PacienteReciente(
+          nombre: paciente.nombreCompleto,
+          ultimaAtencion: entry.value,
+          pendienteSync: false,
+        ));
+      } catch (_) {
+        // Un paciente individual no resoluble no debe tumbar toda la lista.
+      }
+    }
+    return entries;
+  }
+
+  Future<List<_PacienteReciente>> _cargarPacientesLocal() async {
+    final pacientes = await sl<PatientLocalRepository>().getPacientes(null);
+    return pacientes
+        .map((p) => _PacienteReciente(
+              nombre: p.paciente.nombreCompleto,
+              ultimaAtencion: p.paciente.ultimaVisita,
+              pendienteSync: !p.paciente.sincronizado,
+            ))
+        .toList();
+  }
+
+  String _formatFechaRelativa(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Ahora mismo';
+    if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Hace ${diff.inHours} h';
+    if (diff.inDays < 7) return 'Hace ${diff.inDays} d';
+    final d = dt.toLocal();
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  Future<void> _loadStats() async {
+    final repo = sl<PatientLocalRepository>();
+    final ahora = DateTime.now();
+    final hace24h = ahora.subtract(Duration(hours: 24));
+    final hace48h = ahora.subtract(Duration(hours: 48));
+
+    final stats = await repo.getConsultasSyncStats();
+    final nuevos = await repo.contarConsultasEntre(hace24h, ahora);
+    final previo = await repo.contarConsultasEntre(hace48h, hace24h);
+    if (!mounted) return;
+    setState(() {
+      _syncStats = stats;
+      _nuevosCasos24h = nuevos;
+      _casosPeriodoPrevio = previo;
+      _loadingStats = false;
+    });
+  }
+
   Future<void> _sincronizarAhora() async {
     if (_sincronizando) return;
     setState(() => _sincronizando = true);
     final resumen = await sl<SyncService>().syncAll();
     if (!mounted) return;
     setState(() => _sincronizando = false);
+    await _loadStats();
+    if (!mounted) return;
     final mensaje = resumen.huboError
         ? 'No se pudo sincronizar (sin conexión o servidor dormido). Se reintentará.'
         : (resumen.pacientesSincronizados == 0 && resumen.atencionesSincronizadas == 0)
@@ -39,37 +175,35 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildOutbreaksCard(),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _buildSyncCard(),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _buildNewCasesCard(),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _buildMapCard(),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _buildRecentActivity(),
-            const SizedBox(height: 90),
+            SizedBox(height: 20),
+            _buildMisPacientes(),
+            SizedBox(height: 90),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const PatientRegistrationPage(),
-          ),
-        ),
-        backgroundColor: AppColors.primary,
+        onPressed: () => showAddCaseChoiceSheet(context),
+        backgroundColor: AppColors.of(context).primary,
         elevation: 4,
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
+        child: Icon(Icons.add, color: Colors.white, size: 28),
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
@@ -79,19 +213,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
-        icon: const Icon(Icons.account_circle_outlined, color: AppColors.textPrimary, size: 26),
+        icon: Icon(Icons.account_circle_outlined, color: AppColors.of(context).textPrimary, size: 26),
         onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ProfilePage()),
+          MaterialPageRoute(builder: (_) => ProfilePage()),
         ),
       ),
-      title: const Text(
-        'EpiSurveillance',
+      title: Text(
+        'EpiDiagnostix-Mayab',
         style: TextStyle(
-          color: AppColors.primary,
+          color: AppColors.of(context).primary,
           fontWeight: FontWeight.bold,
           fontSize: 20,
           letterSpacing: 0.2,
@@ -99,20 +232,20 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       actions: [
         Container(
-          margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          margin: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFFD1FAE5),
+            color: Color(0xFFD1FAE5),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF6EE7B7), width: 1),
+            border: Border.all(color: Color(0xFF6EE7B7), width: 1),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.circle, color: AppColors.success, size: 7),
+              Icon(Icons.circle, color: AppColors.of(context).success, size: 7),
               SizedBox(width: 5),
               Text(
-                'Online',
+                'En línea',
                 style: TextStyle(
                   color: Color(0xFF065F46),
                   fontSize: 12,
@@ -124,11 +257,11 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         IconButton(
           icon: _sincronizando
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18, height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textSecondary),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.of(context).textSecondary),
                 )
-              : const Icon(Icons.cloud_outlined, color: AppColors.textSecondary, size: 22),
+              : Icon(Icons.cloud_outlined, color: AppColors.of(context).textSecondary, size: 22),
           onPressed: _sincronizando ? null : _sincronizarAhora,
         ),
       ],
@@ -138,40 +271,45 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Header ───────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Surveillance Overview',
+          'Panorama de Vigilancia',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
             height: 1.2,
           ),
         ),
         SizedBox(height: 4),
         Text(
-          'Last localized data update: 09:42 AM',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          'Última actualización local: 09:42 AM',
+          style: TextStyle(fontSize: 12, color: AppColors.of(context).textSecondary),
         ),
       ],
     );
   }
 
-  // ── HIGH PRIORITY Card ───────────────────────────────────────────────────────
+  // ── Brotes Activos: sin agregación epidemiológica en el backend todavía ──────
+  //
+  // No existe (ni en MS1 ni en MS2) un endpoint que agregue diagnósticos por
+  // enfermedad a nivel regional. Antes se mostraba un "12" fijo con chips de
+  // Ébola/Cólera inventados — se reemplaza por un estado honesto en vez de
+  // simular vigilancia poblacional que la app no puede respaldar hoy.
 
   Widget _buildOutbreaksCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -179,95 +317,36 @@ class _DashboardPageState extends State<DashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // HIGH PRIORITY label
-              const Row(
-                children: [
-                  Icon(Icons.circle, color: Color(0xFFEF4444), size: 9),
-                  SizedBox(width: 6),
-                  Text(
-                    'HIGH PRIORITY',
-                    style: TextStyle(
-                      color: Color(0xFFEF4444),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              // Warning triangle
-              Icon(
-                Icons.warning_amber_rounded,
-                color: const Color(0xFFFCA5A5),
-                size: 36,
+              Icon(Icons.query_stats_rounded, color: AppColors.of(context).textMuted, size: 16),
+              SizedBox(width: 6),
+              Text(
+                'BROTES ACTIVOS',
+                style: TextStyle(
+                  color: AppColors.of(context).textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          const Text(
-            '12',
-            style: TextStyle(
-              fontSize: 52,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Active Outbreaks',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _outbreakChip('Ebola (VHF)', '4'),
-              const SizedBox(width: 10),
-              _outbreakChip('Cholera', '8'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _outbreakChip(String disease, String count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEE2E2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+          SizedBox(height: 14),
           Text(
-            disease,
-            style: const TextStyle(
-              color: Color(0xFF991B1B),
+            'Sin datos suficientes',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.of(context).textPrimary,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'La agregación de brotes por enfermedad requiere un endpoint de vigilancia regional que el backend aún no expone.',
+            style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            width: 1,
-            height: 14,
-            color: const Color(0xFFFCA5A5),
-          ),
-          Text(
-            count,
-            style: const TextStyle(
-              color: Color(0xFF991B1B),
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              color: AppColors.of(context).textSecondary,
+              height: 1.4,
             ),
           ),
         ],
@@ -278,10 +357,17 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Sync Progress Card ───────────────────────────────────────────────────────
 
   Widget _buildSyncCard() {
+    final stats = _syncStats;
+    final progreso = stats?.progreso ?? 0.0;
+    final pct = (progreso * 100).round();
+    final etiqueta = _loadingStats
+        ? 'Calculando...'
+        : '${stats?.sincronizadas ?? 0}/${stats?.total ?? 0} Casos Subidos';
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.of(context).primary,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -290,8 +376,8 @@ class _DashboardPageState extends State<DashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Sync Progress',
+              Text(
+                'Progreso de Sincronización',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
@@ -301,9 +387,9 @@ class _DashboardPageState extends State<DashboardPage> {
               Icon(Icons.sync, color: Colors.white.withValues(alpha: 0.85), size: 20),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            '94%',
+          SizedBox(height: 8),
+          Text(
+            _loadingStats ? '—' : '$pct%',
             style: TextStyle(
               color: Colors.white,
               fontSize: 44,
@@ -311,19 +397,19 @@ class _DashboardPageState extends State<DashboardPage> {
               height: 1,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: 0.94,
+              value: _loadingStats ? 0.0 : progreso,
               backgroundColor: Colors.white.withValues(alpha: 0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               minHeight: 6,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            '82/87 Cases Uploaded',
+          SizedBox(height: 10),
+          Text(
+            etiqueta,
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ],
@@ -334,16 +420,30 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── New Cases Card ───────────────────────────────────────────────────────────
 
   Widget _buildNewCasesCard() {
+    final diff = _nuevosCasos24h - _casosPeriodoPrevio;
+    final subiendo = diff >= 0;
+    final String comparacion;
+    if (_loadingStats) {
+      comparacion = 'Calculando...';
+    } else if (_casosPeriodoPrevio == 0) {
+      comparacion = _nuevosCasos24h == 0
+          ? 'Sin casos en las últimas 24h'
+          : '$_nuevosCasos24h nuevo(s) vs. 0 el período anterior';
+    } else {
+      final pct = ((diff / _casosPeriodoPrevio) * 100).round();
+      comparacion = '${pct >= 0 ? '+' : ''}$pct% vs. período anterior';
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -352,43 +452,43 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Row(
             children: [
-              const Text(
-                'New Cases (24h)',
+              Text(
+                'Casos Nuevos (24h)',
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: AppColors.of(context).textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Icon(
-                Icons.trending_up_rounded,
-                color: AppColors.primary.withValues(alpha: 0.8),
+                subiendo ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                color: AppColors.of(context).primary.withValues(alpha: 0.8),
                 size: 20,
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            '+28',
+          SizedBox(height: 8),
+          Text(
+            _loadingStats ? '—' : '+$_nuevosCasos24h',
             style: TextStyle(
               fontSize: 40,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
               height: 1,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFD1FAE5),
+              color: AppColors.of(context).successBackground,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              '12% vs last period',
+            child: Text(
+              comparacion,
               style: TextStyle(
-                color: Color(0xFF065F46),
+                color: AppColors.of(context).success,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -405,13 +505,13 @@ class _DashboardPageState extends State<DashboardPage> {
     return Container(
       height: 175,
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1B2A),
+        color: Color(0xFF0D1B2A),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 12,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -427,12 +527,12 @@ class _DashboardPageState extends State<DashboardPage> {
             top: 10,
             right: 10,
             child: Container(
-              padding: const EdgeInsets.all(5),
+              padding: EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.open_in_full,
                 color: Colors.white,
                 size: 16,
@@ -444,13 +544,13 @@ class _DashboardPageState extends State<DashboardPage> {
             bottom: 12,
             left: 14,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                'District 7 South Center',
+              child: Text(
+                'Distrito 7 Centro Sur',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -459,6 +559,166 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Mis Pacientes ────────────────────────────────────────────────────────────
+
+  Widget _buildMisPacientes() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Mis Pacientes',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.of(context).textPrimary,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => CasosPage()),
+              ),
+              child: Text(
+                'Ver Todos >',
+                style: TextStyle(
+                  color: AppColors.of(context).primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        if (_loadingPacientes)
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.of(context).surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else if (_misPacientes.isEmpty)
+          Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.of(context).surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.people_outline_rounded, color: AppColors.of(context).textMuted, size: 22),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Aún no has atendido pacientes. Los que registres aparecerán aquí.',
+                    style: TextStyle(fontSize: 12, color: AppColors.of(context).textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.of(context).surface,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < _misPacientes.length; i++) ...[
+                  _buildPacienteRow(_misPacientes[i]),
+                  if (i != _misPacientes.length - 1) _buildDivider(),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPacienteRow(_PacienteReciente p) {
+    final inicial = p.nombre.isNotEmpty ? p.nombre[0].toUpperCase() : '?';
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.of(context).primary.withValues(alpha: 0.12),
+            child: Text(
+              inicial,
+              style: TextStyle(
+                color: AppColors.of(context).primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.nombre,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.of(context).textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Última atención: ${_formatFechaRelativa(p.ultimaAtencion)}',
+                  style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8),
+          if (p.pendienteSync)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule_outlined, size: 13, color: AppColors.of(context).warning),
+                SizedBox(width: 3),
+                Text(
+                  'Pendiente',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.of(context).warning,
+                  ),
+                ),
+              ],
+            )
+          else
+            Icon(Icons.check_circle_outline, size: 15, color: AppColors.of(context).success),
         ],
       ),
     );
@@ -473,20 +733,20 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Recent Activity',
+            Text(
+              'Actividad Reciente',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
               ),
             ),
             GestureDetector(
               onTap: () {},
-              child: const Text(
-                'View All >',
+              child: Text(
+                'Ver Todo >',
                 style: TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.of(context).primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -494,16 +754,16 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.of(context).surface,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 10,
-                offset: const Offset(0, 2),
+                offset: Offset(0, 2),
               ),
             ],
           ),
@@ -511,11 +771,11 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _buildTableHeader(),
               _buildDivider(),
-              _buildTableRow('CAS-992-01', 'Suspected\nCholera', '2 mins ago', _SyncStatus.synced),
+              _buildTableRow('CAS-992-01', 'Cólera\nSospechoso', 'Hace 2 min', _SyncStatus.synced),
               _buildDivider(),
-              _buildTableRow('CAS-992-02', 'Dengue\nFever', '15 mins ago', _SyncStatus.pending),
+              _buildTableRow('CAS-992-02', 'Dengue', 'Hace 15 min', _SyncStatus.pending),
               _buildDivider(),
-              _buildTableRow('CAS-991-88', 'Meningitis', '1 hour ago', _SyncStatus.synced),
+              _buildTableRow('CAS-991-88', 'Meningitis', 'Hace 1 hora', _SyncStatus.synced),
             ],
           ),
         ),
@@ -524,21 +784,21 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildTableHeader() {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Expanded(flex: 3, child: _HeaderText('Case ID')),
-          Expanded(flex: 3, child: _HeaderText('Disease')),
-          Expanded(flex: 3, child: _HeaderText('Last\nUpdated')),
-          Expanded(flex: 3, child: _HeaderText('Sync Status')),
+          Expanded(flex: 3, child: _HeaderText('ID de Caso')),
+          Expanded(flex: 3, child: _HeaderText('Enfermedad')),
+          Expanded(flex: 3, child: _HeaderText('Última\nActualización')),
+          Expanded(flex: 3, child: _HeaderText('Estado')),
         ],
       ),
     );
   }
 
   Widget _buildDivider() =>
-      const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6));
+      Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6));
 
   Widget _buildTableRow(
     String caseId,
@@ -547,7 +807,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _SyncStatus syncStatus,
   ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -555,9 +815,9 @@ class _DashboardPageState extends State<DashboardPage> {
             flex: 3,
             child: Text(
               caseId,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -566,9 +826,9 @@ class _DashboardPageState extends State<DashboardPage> {
             flex: 3,
             child: Text(
               disease,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
                 height: 1.3,
               ),
             ),
@@ -577,7 +837,7 @@ class _DashboardPageState extends State<DashboardPage> {
             flex: 3,
             child: Text(
               lastUpdated,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
             ),
           ),
           Expanded(
@@ -592,19 +852,24 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildSyncBadge(_SyncStatus status) {
     final isSynced = status == _SyncStatus.synced;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           isSynced ? Icons.check_circle_outline : Icons.schedule_outlined,
           size: 14,
-          color: isSynced ? AppColors.success : AppColors.warning,
+          color: isSynced ? AppColors.of(context).success : AppColors.of(context).warning,
         ),
-        const SizedBox(width: 4),
-        Text(
-          isSynced ? 'Synced' : 'Pending',
-          style: TextStyle(
-            fontSize: 11,
-            color: isSynced ? AppColors.success : AppColors.warning,
-            fontWeight: FontWeight.w600,
+        SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            isSynced ? 'Sincronizado' : 'Pendiente',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSynced ? AppColors.of(context).success : AppColors.of(context).warning,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -619,36 +884,35 @@ class _DashboardPageState extends State<DashboardPage> {
       onTap: (i) {
         if (i == 1) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AnomaliesPage()),
+            MaterialPageRoute(builder: (_) => AnomaliesPage()),
           );
         } else if (i == 2) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const CasosPage()),
+            MaterialPageRoute(builder: (_) => CasosPage()),
           );
         } else if (i == 3) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const MapaPage()),
+            MaterialPageRoute(builder: (_) => MapaPage()),
           );
         } else if (i == 4) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServiciosPage()),
+            MaterialPageRoute(builder: (_) => ServiciosPage()),
           );
         } else {
           setState(() => _currentNavIndex = i);
         }
       },
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textMuted,
-      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.of(context).primary,
+      unselectedItemColor: AppColors.of(context).textMuted,
       type: BottomNavigationBarType.fixed,
-      selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 10),
+      selectedLabelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 10),
       elevation: 10,
-      items: const [
+      items: [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
           activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          label: 'Inicio',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.warning_amber_outlined),
@@ -683,15 +947,15 @@ enum _SyncStatus { synced, pending }
 
 class _HeaderText extends StatelessWidget {
   final String text;
-  const _HeaderText(this.text);
+  _HeaderText(this.text);
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
         fontWeight: FontWeight.w600,
         height: 1.3,
       ),
@@ -745,12 +1009,12 @@ class _MapPainter extends CustomPainter {
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF3B82F6).withValues(alpha: 0.75),
-          const Color(0xFF1D4ED8).withValues(alpha: 0.45),
-          const Color(0xFF1E40AF).withValues(alpha: 0.15),
+          Color(0xFF3B82F6).withValues(alpha: 0.75),
+          Color(0xFF1D4ED8).withValues(alpha: 0.45),
+          Color(0xFF1E40AF).withValues(alpha: 0.15),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.35, 0.65, 1.0],
+        stops: [0.0, 0.35, 0.65, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
 
     canvas.drawCircle(center, radius, glowPaint);

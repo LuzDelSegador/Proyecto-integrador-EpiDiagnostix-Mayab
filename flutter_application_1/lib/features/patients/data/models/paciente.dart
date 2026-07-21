@@ -58,6 +58,8 @@ class ConsultaResumen {
   final String? categoriaSintoma;
   final Map<String, dynamic> camposExtraidos;
   final bool sincronizado;
+  final double? latitud;
+  final double? longitud;
 
   const ConsultaResumen({
     required this.id,
@@ -71,5 +73,7 @@ class ConsultaResumen {
     this.categoriaSintoma,
     required this.camposExtraidos,
     this.sincronizado = false,
+    this.latitud,
+    this.longitud,
   });
 }

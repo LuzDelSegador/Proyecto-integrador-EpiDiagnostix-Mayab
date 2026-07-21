@@ -5,7 +5,7 @@ import '../../../cases/presentation/pages/casos_page.dart';
 import '../../data/plan_service.dart';
 
 class CedulaSolicitudPage extends StatefulWidget {
-  const CedulaSolicitudPage({super.key});
+  CedulaSolicitudPage({super.key});
 
   @override
   State<CedulaSolicitudPage> createState() => _CedulaSolicitudPageState();
@@ -48,9 +48,9 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Error de conexión. Verifica tu red e intenta nuevamente.'),
-          backgroundColor: AppColors.error,
+          backgroundColor: AppColors.of(context).error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -64,14 +64,14 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _SuccessSheet(
         onEntendido: () {
           nav.pop(); // cierra el sheet
           nav.pushReplacement(
-            MaterialPageRoute(builder: (_) => const CasosPage()),
+            MaterialPageRoute(builder: (_) => CasosPage()),
           );
         },
       ),
@@ -82,29 +82,28 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const _DuplicadaSheet(),
+      builder: (_) => _DuplicadaSheet(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.of(context).background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.08),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: AppColors.of(context).textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Verificación de Cédula',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 17,
           ),
@@ -112,16 +111,16 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             _buildFormCard(),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _buildSubmitButton(),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildLegalNote(),
           ],
         ),
@@ -138,31 +137,31 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
           width: 68,
           height: 68,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: AppColors.of(context).primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.verified_user_rounded,
-            color: AppColors.primary,
+            color: AppColors.of(context).primary,
             size: 34,
           ),
         ),
-        const SizedBox(height: 14),
-        const Text(
+        SizedBox(height: 14),
+        Text(
           'Verificación Profesional',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: AppColors.of(context).primary,
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: 8),
+        Text(
           'Ingresa los datos de tu cédula profesional. El equipo de EpiDiagnostix la verificará en menos de 48 horas hábiles.',
           style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             height: 1.55,
           ),
           textAlign: TextAlign.center,
@@ -175,15 +174,15 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
 
   Widget _buildFormCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 18,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -193,7 +192,7 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _label('Número de Cédula Profesional'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _cedulaController,
               keyboardType: TextInputType.number,
@@ -207,9 +206,9 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _label('Nombre Completo (tal como aparece en la cédula)'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _nombreController,
               textCapitalization: TextCapitalization.words,
@@ -223,9 +222,9 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _label('Especialidad médica (opcional)'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _especialidadController,
               textCapitalization: TextCapitalization.sentences,
@@ -243,7 +242,7 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
   Widget _label(String text) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: Color(0xFF374151),
@@ -254,30 +253,30 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
   InputDecoration _inputDeco({required String hint, required IconData icon}) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inputBackground,
-      prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+      fillColor: AppColors.of(context).inputBackground,
+      prefixIcon: Icon(icon, color: AppColors.of(context).textMuted, size: 20),
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error),
+        borderSide: BorderSide(color: AppColors.of(context).error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).error, width: 1.5),
       ),
     );
   }
@@ -290,22 +289,22 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
       child: ElevatedButton.icon(
         onPressed: _isLoading ? null : _handleEnviar,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+          backgroundColor: AppColors.of(context).primary,
+          disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.5),
           foregroundColor: Colors.white,
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         icon: _isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
               )
-            : const Icon(Icons.send_rounded, size: 20),
+            : Icon(Icons.send_rounded, size: 20),
         label: Text(
           _isLoading ? 'Enviando solicitud...' : 'Enviar solicitud',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -313,23 +312,23 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
 
   Widget _buildLegalNote() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.infoBackground,
+        color: AppColors.of(context).infoBackground,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.infoBorder),
+        border: Border.all(color: AppColors.of(context).infoBorder),
       ),
-      child: const Row(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: AppColors.info, size: 16),
+          Icon(Icons.info_outline, color: AppColors.of(context).info, size: 16),
           SizedBox(width: 8),
           Expanded(
             child: Text(
               'Al enviar, aceptas que verificaremos tu cédula profesional a través del registro oficial de la SEP. Tu cuenta permanecerá en el plan actual hasta que la verificación sea aprobada.',
               style: TextStyle(
                 fontSize: 11,
-                color: AppColors.info,
+                color: AppColors.of(context).info,
                 height: 1.5,
               ),
             ),
@@ -344,12 +343,12 @@ class _CedulaSolicitudPageState extends State<CedulaSolicitudPage> {
 
 class _SuccessSheet extends StatelessWidget {
   final VoidCallback onEntendido;
-  const _SuccessSheet({required this.onEntendido});
+  _SuccessSheet({required this.onEntendido});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 36),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -357,57 +356,57 @@ class _SuccessSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5E7EB),
+              color: Color(0xFFE5E7EB),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Container(
             width: 68,
             height: 68,
             decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.12),
+              color: AppColors.of(context).success.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.check_circle_rounded,
-              color: AppColors.success,
+              color: AppColors.of(context).success,
               size: 38,
             ),
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 18),
+          Text(
             '¡Solicitud enviada!',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             'Verificaremos tu cédula en menos de 48 horas hábiles. Te notificaremos cuando tu cuenta Premium esté activa.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: AppColors.of(context).textSecondary,
               height: 1.55,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 28),
+          SizedBox(height: 28),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
               onPressed: onEntendido,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.of(context).primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Entendido',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
@@ -422,12 +421,12 @@ class _SuccessSheet extends StatelessWidget {
 // ── BottomSheet: Solicitud duplicada ─────────────────────────────────────────
 
 class _DuplicadaSheet extends StatelessWidget {
-  const _DuplicadaSheet();
+  _DuplicadaSheet();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      padding: EdgeInsets.fromLTRB(24, 20, 24, 36),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -435,57 +434,57 @@ class _DuplicadaSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: const Color(0xFFE5E7EB),
+              color: Color(0xFFE5E7EB),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Container(
             width: 68,
             height: 68,
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
+              color: Color(0xFFFEF3C7),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.hourglass_top_rounded,
               color: Color(0xFFD97706),
               size: 34,
             ),
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 18),
+          Text(
             'Solicitud en proceso',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             'Ya tienes una solicitud en proceso. Te contactaremos pronto para confirmar la activación de tu cuenta Premium.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: AppColors.of(context).textSecondary,
               height: 1.55,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 28),
+          SizedBox(height: 28),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706),
+                backgroundColor: Color(0xFFD97706),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Entendido',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),

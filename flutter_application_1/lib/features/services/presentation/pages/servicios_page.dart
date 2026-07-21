@@ -9,7 +9,7 @@ import '../../../cases/presentation/pages/casos_page.dart';
 import '../../../map/presentation/pages/mapa_page.dart';
 
 class ServiciosPage extends StatefulWidget {
-  const ServiciosPage({super.key});
+  ServiciosPage({super.key});
 
   @override
   State<ServiciosPage> createState() => _ServiciosPageState();
@@ -56,12 +56,12 @@ class _ServiciosPageState extends State<ServiciosPage> {
     // TODO: Connect with backend endpoint here
     // POST /api/services/sync/force
     setState(() => _syncing = true);
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: 2));
     if (mounted) {
       setState(() => _syncing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
               Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
               SizedBox(width: 10),
@@ -69,11 +69,11 @@ class _ServiciosPageState extends State<ServiciosPage> {
                   style: TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
-          backgroundColor: AppColors.success,
+          backgroundColor: AppColors.of(context).success,
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     }
@@ -86,38 +86,38 @@ class _ServiciosPageState extends State<ServiciosPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('Limpiar caché local',
+        title: Text('Limpiar caché local',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: const Text(
+        content: Text(
           '¿Eliminar los registros en caché? Los datos no sincronizados se perderán.',
           style: TextStyle(fontSize: 13, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar',
-                style: TextStyle(color: AppColors.textMuted)),
+            child: Text('Cancelar',
+                style: TextStyle(color: AppColors.of(context).textMuted)),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('Caché limpiada correctamente'),
-                  backgroundColor: AppColors.primary,
+                  content: Text('Caché limpiada correctamente'),
+                  backgroundColor: AppColors.of(context).primary,
                   behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: Color(0xFFDC2626),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Limpiar',
+            child: Text('Limpiar',
                 style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -130,23 +130,23 @@ class _ServiciosPageState extends State<ServiciosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+        padding: EdgeInsets.fromLTRB(16, 20, 16, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSystemServicesSection(),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _buildTrafficCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildLocalCacheCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildInformationCard(),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildTopologyCard(),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
         ),
       ),
@@ -158,21 +158,23 @@ class _ServiciosPageState extends State<ServiciosPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(kToolbarHeight + 34),
+      preferredSize: Size.fromHeight(kToolbarHeight + 34),
       child: Column(
         children: [
           // Status banner
           Container(
-            color: const Color(0xFF0D3D2A),
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+            color: Color(0xFF0D3D2A),
+            padding: EdgeInsets.fromLTRB(14, 10, 14, 8),
             child: Row(
               children: [
-                const Icon(Icons.cloud_done_outlined,
+                Icon(Icons.cloud_done_outlined,
                     color: Colors.white70, size: 14),
-                const SizedBox(width: 6),
-                const Expanded(
+                SizedBox(width: 6),
+                Expanded(
                   child: Text(
-                    'Cloud Connected: District 7 Node',
+                    'Nube Conectada: Nodo Distrito 7',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 11,
@@ -183,15 +185,17 @@ class _ServiciosPageState extends State<ServiciosPage> {
                 Container(
                   width: 7,
                   height: 7,
-                  margin: const EdgeInsets.only(right: 5),
-                  decoration: const BoxDecoration(
+                  margin: EdgeInsets.only(right: 5),
+                  decoration: BoxDecoration(
                     color: Color(0xFF4ADE80),
                     shape: BoxShape.circle,
                   ),
                 ),
                 Text(
-                  'System Latency: $_systemLatency',
-                  style: const TextStyle(
+                  'Latencia del Sistema: $_systemLatency',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
@@ -202,23 +206,24 @@ class _ServiciosPageState extends State<ServiciosPage> {
           ),
           // Main AppBar
           AppBar(
-            backgroundColor: Colors.white,
             elevation: 1,
             shadowColor: Colors.black.withValues(alpha: 0.08),
             leading: IconButton(
-              icon: const Icon(Icons.account_circle_outlined,
-                  color: AppColors.textPrimary, size: 26),
+              icon: Icon(Icons.account_circle_outlined,
+                  color: AppColors.of(context).textPrimary, size: 26),
               onPressed: () {
                 context.read<AuthProvider>().resetStatus();
                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  MaterialPageRoute(builder: (_) => LoginPage()),
                 );
               },
             ),
-            title: const Text(
-              'EpiSurveillance',
+            title: Text(
+              'EpiDiagnostix-Mayab',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
               ),
@@ -226,8 +231,8 @@ class _ServiciosPageState extends State<ServiciosPage> {
             centerTitle: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.cloud_outlined,
-                    color: AppColors.textSecondary, size: 22),
+                icon: Icon(Icons.cloud_outlined,
+                    color: AppColors.of(context).textSecondary, size: 22),
                 onPressed: () {},
               ),
             ],
@@ -243,20 +248,20 @@ class _ServiciosPageState extends State<ServiciosPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'System Services',
+        Text(
+          'Servicios del Sistema',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
-        const SizedBox(height: 2),
-        const Text(
-          'Manage core microservices and local data persistence.',
-          style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
+        SizedBox(height: 2),
+        Text(
+          'Administra los microservicios principales y la persistencia local de datos.',
+          style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted, height: 1.4),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         // Force sync button
         SizedBox(
           width: double.infinity,
@@ -264,73 +269,73 @@ class _ServiciosPageState extends State<ServiciosPage> {
           child: ElevatedButton.icon(
             onPressed: _syncing ? null : _onForceSync,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.of(context).primary,
               foregroundColor: Colors.white,
-              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+              disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.6),
               elevation: 0,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
             icon: _syncing
-                ? const SizedBox(
+                ? SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2),
                   )
-                : const Icon(Icons.sync_rounded, size: 18),
+                : Icon(Icons.sync_rounded, size: 18),
             label: Text(
-              _syncing ? 'Sincronizando...' : 'Force System Sync',
-              style: const TextStyle(
+              _syncing ? 'Sincronizando...' : 'Forzar Sincronización',
+              style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildServiceCard(
           id: 'gps',
           icon: Icons.gps_fixed_rounded,
-          iconColor: AppColors.primary,
-          title: 'GPS Sync',
-          subtitle: 'Live Tracking',
-          detail: 'Uptime: 99.9%',
+          iconColor: AppColors.of(context).primary,
+          title: 'Sincronización GPS',
+          subtitle: 'Rastreo en Vivo',
+          detail: 'Actividad: 99.9%',
           enabled: _gpsSync,
-          activeLabel: 'Active',
+          activeLabel: 'Activo',
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildServiceCard(
           id: 'ai',
           icon: Icons.psychology_rounded,
-          iconColor: const Color(0xFF7C3AED),
-          title: 'AI Triage',
-          subtitle: 'Pattern Detection',
-          detail: 'Model: v4.2.1-f',
+          iconColor: Color(0xFF7C3AED),
+          title: 'Triaje con IA',
+          subtitle: 'Detección de Patrones',
+          detail: 'Modelo: v4.2.1-f',
           enabled: _aiTriage,
-          activeLabel: 'Active',
+          activeLabel: 'Activo',
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildServiceCard(
           id: 'db',
           icon: Icons.storage_rounded,
-          iconColor: const Color(0xFF0284C7),
-          title: 'Database Cache',
-          subtitle: 'Local Persistence',
-          detail: 'Sync: 4m ago',
+          iconColor: Color(0xFF0284C7),
+          title: 'Caché de Base de Datos',
+          subtitle: 'Persistencia Local',
+          detail: 'Sinc.: hace 4 min',
           enabled: _dbCache,
-          activeLabel: 'Healthy',
-          inactiveLabel: 'Offline',
+          activeLabel: 'Saludable',
+          inactiveLabel: 'Sin conexión',
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _buildServiceCard(
           id: 'alert',
           icon: Icons.notification_important_rounded,
-          iconColor: const Color(0xFFDC2626),
-          title: 'Alert Engine',
-          subtitle: 'Threshold Monitor',
-          detail: 'Rules: 12 active',
+          iconColor: Color(0xFFDC2626),
+          title: 'Motor de Alertas',
+          subtitle: 'Monitor de Umbrales',
+          detail: 'Reglas: 12 activas',
           enabled: _alertEngine,
-          activeLabel: 'Active',
-          inactiveLabel: 'Suspended',
+          activeLabel: 'Activo',
+          inactiveLabel: 'Suspendido',
         ),
       ],
     );
@@ -345,18 +350,18 @@ class _ServiciosPageState extends State<ServiciosPage> {
     required String detail,
     required bool enabled,
     required String activeLabel,
-    String inactiveLabel = 'Inactive',
+    String inactiveLabel = 'Inactivo',
   }) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      padding: EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -374,24 +379,24 @@ class _ServiciosPageState extends State<ServiciosPage> {
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: AppColors.of(context).textPrimary,
                       ),
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                   ],
@@ -400,22 +405,22 @@ class _ServiciosPageState extends State<ServiciosPage> {
               Switch(
                 value: enabled,
                 activeThumbColor: Colors.white,
-                activeTrackColor: AppColors.primary,
+                activeTrackColor: AppColors.of(context).primary,
                 onChanged: (v) => _onToggleService(id, v),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
+          Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
+          SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 detail,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
               Row(
@@ -424,17 +429,17 @@ class _ServiciosPageState extends State<ServiciosPage> {
                     width: 6,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: enabled ? AppColors.success : AppColors.textMuted,
+                      color: enabled ? AppColors.of(context).success : AppColors.of(context).textMuted,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 5),
+                  SizedBox(width: 5),
                   Text(
                     enabled ? activeLabel : inactiveLabel,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: enabled ? AppColors.success : AppColors.textMuted,
+                      color: enabled ? AppColors.of(context).success : AppColors.of(context).textMuted,
                     ),
                   ),
                 ],
@@ -450,48 +455,48 @@ class _ServiciosPageState extends State<ServiciosPage> {
 
   Widget _buildTrafficCard() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Traffic Throughput',
+          Text(
+            'Tráfico de Red',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           SizedBox(
             height: 90,
             child: CustomPaint(
-              painter: _TrafficPainter(data: _trafficData),
-              size: const Size(double.infinity, 90),
+              painter: _TrafficPainter(data: _trafficData, primaryColor: AppColors.of(context).primary),
+              size: Size(double.infinity, 90),
             ),
           ),
-          const SizedBox(height: 10),
-          const Row(
+          SizedBox(height: 10),
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '08:00 AM',
-                style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 10, color: AppColors.of(context).textMuted),
               ),
               Text(
-                '09:00 AM (Now)',
-                style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                '09:00 AM (Ahora)',
+                style: TextStyle(fontSize: 10, color: AppColors.of(context).textMuted),
               ),
             ],
           ),
@@ -506,15 +511,15 @@ class _ServiciosPageState extends State<ServiciosPage> {
     final progress = _cacheUsed / _cacheTotal;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -523,82 +528,82 @@ class _ServiciosPageState extends State<ServiciosPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.sd_storage_rounded,
-                  color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Local Cache',
+              Icon(Icons.sd_storage_rounded,
+                  color: AppColors.of(context).primary, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Caché Local',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Storage Used',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              Text(
+                'Almacenamiento Usado',
+                style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
               ),
               Text(
                 '${_cacheUsed.toStringAsFixed(1)} GB / ${_cacheTotal.toStringAsFixed(1)} GB',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress,
-              backgroundColor: const Color(0xFFE5E7EB),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              backgroundColor: Color(0xFFE5E7EB),
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.of(context).primary),
               minHeight: 8,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: _buildCacheStat(
-                  label: 'Offline Records',
+                  label: 'Registros Sin Conexión',
                   value: _offlineRecords.toString(),
-                  valueColor: const Color(0xFF0284C7),
+                  valueColor: Color(0xFF0284C7),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: _buildCacheStat(
-                  label: 'Sync Queue',
+                  label: 'Cola de Sincronización',
                   value: _syncQueue.toString(),
-                  valueColor: const Color(0xFFD97706),
+                  valueColor: Color(0xFFD97706),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 42,
             child: OutlinedButton.icon(
               onPressed: _onClearCache,
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFDC2626),
-                side: const BorderSide(color: Color(0xFFDC2626), width: 1),
+                foregroundColor: Color(0xFFDC2626),
+                side: BorderSide(color: Color(0xFFDC2626), width: 1),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              icon: const Icon(Icons.delete_outline_rounded, size: 16),
-              label: const Text(
-                'Clear Local Cache',
+              icon: Icon(Icons.delete_outline_rounded, size: 16),
+              label: Text(
+                'Limpiar Caché Local',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
@@ -614,24 +619,24 @@ class _ServiciosPageState extends State<ServiciosPage> {
     required Color valueColor,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: Color(0xFFE5E7EB)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
@@ -650,35 +655,35 @@ class _ServiciosPageState extends State<ServiciosPage> {
 
   Widget _buildInformationCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Information',
+          Text(
+            'Información',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
-          const SizedBox(height: 12),
-          _buildInfoRow('Kernel Version', '4.12.0-stable'),
-          const Divider(height: 20, thickness: 1, color: Color(0xFFF3F4F6)),
-          _buildInfoRow('District Code', 'D-07-CENTRAL'),
-          const Divider(height: 20, thickness: 1, color: Color(0xFFF3F4F6)),
-          _buildInfoRow('Node Identity', 'FW-0892'),
+          SizedBox(height: 12),
+          _buildInfoRow('Versión del Sistema', '4.12.0-stable'),
+          Divider(height: 20, thickness: 1, color: Color(0xFFF3F4F6)),
+          _buildInfoRow('Código de Distrito', 'D-07-CENTRAL'),
+          Divider(height: 20, thickness: 1, color: Color(0xFFF3F4F6)),
+          _buildInfoRow('Identidad del Nodo', 'FW-0892'),
         ],
       ),
     );
@@ -690,17 +695,17 @@ class _ServiciosPageState extends State<ServiciosPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
           ),
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
       ],
@@ -723,13 +728,13 @@ class _ServiciosPageState extends State<ServiciosPage> {
               bottom: 16,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'System Topology',
+                child: Text(
+                  'Topología del Sistema',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -754,33 +759,32 @@ class _ServiciosPageState extends State<ServiciosPage> {
           Navigator.of(context).popUntil((route) => route.isFirst);
         } else if (i == 1) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AnomaliesPage()),
+            MaterialPageRoute(builder: (_) => AnomaliesPage()),
           );
         } else if (i == 2) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const CasosPage()),
+            MaterialPageRoute(builder: (_) => CasosPage()),
           );
         } else if (i == 3) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MapaPage()),
+            MaterialPageRoute(builder: (_) => MapaPage()),
           );
         } else if (i == 4) {
           // ya estamos aquí
         }
       },
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textMuted,
-      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.of(context).primary,
+      unselectedItemColor: AppColors.of(context).textMuted,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle:
-          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 10),
+          TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 10),
       elevation: 10,
-      items: const [
+      items: [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
           activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          label: 'Inicio',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.warning_amber_outlined),
@@ -811,7 +815,8 @@ class _ServiciosPageState extends State<ServiciosPage> {
 
 class _TrafficPainter extends CustomPainter {
   final List<double> data;
-  const _TrafficPainter({required this.data});
+  final Color primaryColor;
+  _TrafficPainter({required this.data, required this.primaryColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -827,23 +832,23 @@ class _TrafficPainter extends CustomPainter {
 
       final isLast = i == count - 1;
       final color = isLast
-          ? AppColors.primary
+          ? primaryColor
           : Color.lerp(
-              const Color(0xFF93C5B8),
-              AppColors.primary,
+              Color(0xFF93C5B8),
+              primaryColor,
               data[i],
             )!;
 
       final rect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x, y, barWidth, barHeight),
-        const Radius.circular(3),
+        Radius.circular(3),
       );
       canvas.drawRRect(rect, Paint()..color = color);
     }
   }
 
   @override
-  bool shouldRepaint(_TrafficPainter old) => old.data != data;
+  bool shouldRepaint(_TrafficPainter old) => old.data != data || old.primaryColor != primaryColor;
 }
 
 // ── System topology painter ────────────────────────────────────────────────────
@@ -853,7 +858,7 @@ class _TopologyPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // Background gradient
     final bgPaint = Paint()
-      ..shader = const LinearGradient(
+      ..shader = LinearGradient(
         colors: [Color(0xFF062A20), Color(0xFF0D4A36), Color(0xFF0A3D2E)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -861,17 +866,17 @@ class _TopologyPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
     final linePaint = Paint()
-      ..color = const Color(0xFF1B6E52).withValues(alpha: 0.6)
+      ..color = Color(0xFF1B6E52).withValues(alpha: 0.6)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
     final glowPaint = Paint()
-      ..color = const Color(0xFF26A87A).withValues(alpha: 0.4)
+      ..color = Color(0xFF26A87A).withValues(alpha: 0.4)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
     final dotPaint = Paint()
-      ..color = const Color(0xFF4ADE80).withValues(alpha: 0.8)
+      ..color = Color(0xFF4ADE80).withValues(alpha: 0.8)
       ..style = PaintingStyle.fill;
 
     // Horizontal grid lines
@@ -908,14 +913,14 @@ class _TopologyPainter extends CustomPainter {
         nodes[i],
         radius + 4,
         Paint()
-          ..color = const Color(0xFF4ADE80).withValues(alpha: 0.15)
+          ..color = Color(0xFF4ADE80).withValues(alpha: 0.15)
           ..style = PaintingStyle.fill,
       );
     }
 
     // Pulse circles (decorative)
     final pulsePaint = Paint()
-      ..color = const Color(0xFF26A87A).withValues(alpha: 0.08)
+      ..color = Color(0xFF26A87A).withValues(alpha: 0.08)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(
         Offset(size.width * 0.75, size.height * 0.35), 45, pulsePaint);
@@ -924,7 +929,7 @@ class _TopologyPainter extends CustomPainter {
 
     // Corner accent
     final accentPaint = Paint()
-      ..color = const Color(0xFF26A87A).withValues(alpha: 0.25)
+      ..color = Color(0xFF26A87A).withValues(alpha: 0.25)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
     final r = math.pi / 180;

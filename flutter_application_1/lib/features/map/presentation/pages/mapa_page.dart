@@ -13,7 +13,7 @@ import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 
 class MapaPage extends StatefulWidget {
-  const MapaPage({super.key});
+  MapaPage({super.key});
 
   @override
   State<MapaPage> createState() => _MapaPageState();
@@ -25,7 +25,7 @@ class _MapaPageState extends State<MapaPage> {
 
   String _selectedDisease = 'Influenza-A';
   String _selectedPeriod = 'Últimos 14 días';
-  _DistrictInfo? _selectedDistrict = const _DistrictInfo(
+  _DistrictInfo? _selectedDistrict = _DistrictInfo(
     name: 'Distrito 7-A',
     risk: _RiskLevel.high,
     newCases: 42,
@@ -53,7 +53,7 @@ class _MapaPageState extends State<MapaPage> {
     final bloqueado = !role.puedeVerMapa;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: bloqueado
           ? UpgradeRequiredWidget(
@@ -63,7 +63,7 @@ class _MapaPageState extends State<MapaPage> {
                   'Visualiza focos de infección, zonas de riesgo y análisis '
                   'espacial de brotes en tiempo real.',
               onVerPlanes: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PlanesPage()),
+                MaterialPageRoute(builder: (_) => PlanesPage()),
               ),
             )
           : Stack(
@@ -83,23 +83,22 @@ class _MapaPageState extends State<MapaPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.08),
       leading: IconButton(
-        icon: const Icon(Icons.account_circle_outlined,
-            color: AppColors.textPrimary, size: 26),
+        icon: Icon(Icons.account_circle_outlined,
+            color: AppColors.of(context).textPrimary, size: 26),
         onPressed: () {
           context.read<AuthProvider>().resetStatus();
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
+            MaterialPageRoute(builder: (_) => LoginPage()),
           );
         },
       ),
-      title: const Text(
-        'EpiSurveillance',
+      title: Text(
+        'EpiDiagnostix-Mayab',
         style: TextStyle(
-          color: AppColors.primary,
+          color: AppColors.of(context).primary,
           fontWeight: FontWeight.bold,
           fontSize: 20,
         ),
@@ -107,8 +106,8 @@ class _MapaPageState extends State<MapaPage> {
       centerTitle: true,
       actions: [
         IconButton(
-          icon: const Icon(Icons.cloud_outlined,
-              color: AppColors.textSecondary, size: 22),
+          icon: Icon(Icons.cloud_outlined,
+              color: AppColors.of(context).textSecondary, size: 22),
           onPressed: () {},
         ),
       ],
@@ -130,15 +129,15 @@ class _MapaPageState extends State<MapaPage> {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.episurveillance.app',
+          userAgentPackageName: 'com.epidiagnostix.mayab.app',
           maxZoom: 19,
         ),
         CircleLayer(
           circles: _hotspots.map((h) {
             final color = switch (h.level) {
-              _RiskLevel.high   => const Color(0xFFDC2626),
-              _RiskLevel.medium => const Color(0xFFD97706),
-              _RiskLevel.low    => const Color(0xFF059669),
+              _RiskLevel.high   => Color(0xFFDC2626),
+              _RiskLevel.medium => Color(0xFFD97706),
+              _RiskLevel.low    => Color(0xFF059669),
             };
             return CircleMarker(
               point: h.point,
@@ -153,9 +152,9 @@ class _MapaPageState extends State<MapaPage> {
         MarkerLayer(
           markers: _hotspots.map((h) {
             final (icon, color) = switch (h.level) {
-              _RiskLevel.high   => (Icons.warning_rounded, const Color(0xFFDC2626)),
-              _RiskLevel.medium => (Icons.warning_amber_rounded, const Color(0xFFD97706)),
-              _RiskLevel.low    => (Icons.info_outline_rounded, const Color(0xFF059669)),
+              _RiskLevel.high   => (Icons.warning_rounded, Color(0xFFDC2626)),
+              _RiskLevel.medium => (Icons.warning_amber_rounded, Color(0xFFD97706)),
+              _RiskLevel.low    => (Icons.info_outline_rounded, Color(0xFF059669)),
             };
             return Marker(
               point: h.point,
@@ -170,10 +169,10 @@ class _MapaPageState extends State<MapaPage> {
                     caseDelta: h.level == _RiskLevel.high ? '+12' : h.level == _RiskLevel.medium ? '+5' : '+1',
                     testRate: h.level == _RiskLevel.high ? 8.4 : h.level == _RiskLevel.medium ? 4.2 : 1.8,
                     recommendations: h.level == _RiskLevel.high
-                        ? const ['Desplegar unidad móvil de pruebas en Sector B.', 'Priorizar distribución de refuerzos de vacuna.']
+                        ? ['Desplegar unidad móvil de pruebas en Sector B.', 'Priorizar distribución de refuerzos de vacuna.']
                         : h.level == _RiskLevel.medium
-                            ? const ['Aumentar vigilancia activa en el sector.', 'Reforzar medidas de higiene en centros comunitarios.']
-                            : const ['Continuar seguimiento de contactos.', 'Mantener protocolos de prevención estándar.'],
+                            ? ['Aumentar vigilancia activa en el sector.', 'Reforzar medidas de higiene en centros comunitarios.']
+                            : ['Continuar seguimiento de contactos.', 'Mantener protocolos de prevención estándar.'],
                   );
                 }),
                 child: Container(
@@ -184,7 +183,7 @@ class _MapaPageState extends State<MapaPage> {
                       BoxShadow(
                         color: color.withValues(alpha: 0.4),
                         blurRadius: 6,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
@@ -212,7 +211,7 @@ class _MapaPageState extends State<MapaPage> {
             label: 'ENFERMEDAD: $_selectedDisease',
             onTap: _showDiseaseSelector,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           _buildChip(
             icon: Icons.date_range_rounded,
             label: _selectedPeriod,
@@ -231,34 +230,34 @@ class _MapaPageState extends State<MapaPage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 6,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: AppColors.primary),
-            const SizedBox(width: 5),
+            Icon(icon, size: 14, color: AppColors.of(context).primary),
+            SizedBox(width: 5),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 14, color: AppColors.textMuted),
+            SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 14, color: AppColors.of(context).textMuted),
           ],
         ),
       ),
@@ -275,12 +274,12 @@ class _MapaPageState extends State<MapaPage> {
         children: [
           _mapButton(Icons.add, () => _mapController.move(
             _mapController.camera.center, _mapController.camera.zoom + 1)),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           _mapButton(Icons.remove, () => _mapController.move(
             _mapController.camera.center, _mapController.camera.zoom - 1)),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           _mapButton(Icons.my_location_rounded, () => _mapController.move(_center, 13.0)),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           _mapButton(Icons.layers_outlined, () {}),
         ],
       ),
@@ -294,17 +293,17 @@ class _MapaPageState extends State<MapaPage> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 6,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
-        child: Icon(icon, size: 18, color: AppColors.textPrimary),
+        child: Icon(icon, size: 18, color: AppColors.of(context).textPrimary),
       ),
     );
   }
@@ -313,9 +312,9 @@ class _MapaPageState extends State<MapaPage> {
 
   Widget _buildInfoPanel(_DistrictInfo district) {
     final (riskLabel, riskColor) = switch (district.risk) {
-      _RiskLevel.high   => ('ALTO RIESGO', const Color(0xFFDC2626)),
-      _RiskLevel.medium => ('RIESGO MODERADO', const Color(0xFFD97706)),
-      _RiskLevel.low    => ('RIESGO BAJO', const Color(0xFF059669)),
+      _RiskLevel.high   => ('ALTO RIESGO', Color(0xFFDC2626)),
+      _RiskLevel.medium => ('RIESGO MODERADO', Color(0xFFD97706)),
+      _RiskLevel.low    => ('RIESGO BAJO', Color(0xFF059669)),
     };
 
     return Positioned(
@@ -324,13 +323,13 @@ class _MapaPageState extends State<MapaPage> {
       right: 12,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 14,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -340,7 +339,7 @@ class _MapaPageState extends State<MapaPage> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Row(
                 children: [
                   Expanded(
@@ -349,32 +348,32 @@ class _MapaPageState extends State<MapaPage> {
                       children: [
                         Text(
                           district.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: AppColors.of(context).textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
+                        SizedBox(height: 2),
+                        Text(
                           'Estado de Zona Seleccionada',
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
                       color: riskColor,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       riskLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -384,10 +383,10 @@ class _MapaPageState extends State<MapaPage> {
                 ],
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
+            Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
             // Stats
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Row(
                 children: [
                   Expanded(
@@ -398,7 +397,7 @@ class _MapaPageState extends State<MapaPage> {
                       deltaPositive: false,
                     ),
                   ),
-                  Container(width: 1, height: 40, color: const Color(0xFFF3F4F6)),
+                  Container(width: 1, height: 40, color: Color(0xFFF3F4F6)),
                   Expanded(
                     child: _buildStatColumn(
                       'Tasa de Pruebas',
@@ -409,37 +408,37 @@ class _MapaPageState extends State<MapaPage> {
                 ],
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
+            Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
             // Recommendations
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'RECOMENDACIONES',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                       letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   ...district.recommendations.map((r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: EdgeInsets.only(bottom: 6),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.warning_amber_rounded,
+                        Icon(Icons.warning_amber_rounded,
                             size: 14, color: Color(0xFFD97706)),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             r,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textPrimary,
+                              color: AppColors.of(context).textPrimary,
                               height: 1.4,
                             ),
                           ),
@@ -452,22 +451,22 @@ class _MapaPageState extends State<MapaPage> {
             ),
             // CTA button
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
               child: SizedBox(
                 width: double.infinity,
                 height: 42,
                 child: ElevatedButton.icon(
                   onPressed: () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppColors.of(context).primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  icon: const Icon(Icons.bar_chart_rounded, size: 16),
-                  label: const Text(
+                  icon: Icon(Icons.bar_chart_rounded, size: 16),
+                  label: Text(
                     'Análisis Completo de Zona',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
@@ -483,56 +482,56 @@ class _MapaPageState extends State<MapaPage> {
   Widget _buildStatColumn(String label, String value,
       {String? delta, bool deltaPositive = true, String? suffix}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
               letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                   height: 1,
                 ),
               ),
               if (suffix != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 3, left: 2),
+                  padding: EdgeInsets.only(bottom: 3, left: 2),
                   child: Text(
                     suffix,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                      color: AppColors.of(context).textSecondary,
                     ),
                   ),
                 ),
               if (delta != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 3, left: 6),
+                  padding: EdgeInsets.only(bottom: 3, left: 6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFE4E4),
+                      color: Color(0xFFFFE4E4),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       delta,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFFDC2626),
@@ -557,33 +556,32 @@ class _MapaPageState extends State<MapaPage> {
           Navigator.of(context).popUntil((route) => route.isFirst);
         } else if (i == 1) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AnomaliesPage()),
+            MaterialPageRoute(builder: (_) => AnomaliesPage()),
           );
         } else if (i == 2) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const CasosPage()),
+            MaterialPageRoute(builder: (_) => CasosPage()),
           );
         } else if (i == 3) {
           // ya estamos aquí
         } else if (i == 4) {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ServiciosPage()),
+            MaterialPageRoute(builder: (_) => ServiciosPage()),
           );
         }
       },
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textMuted,
-      backgroundColor: Colors.white,
+      selectedItemColor: AppColors.of(context).primary,
+      unselectedItemColor: AppColors.of(context).textMuted,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle:
-          const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 10),
+          TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 10),
       elevation: 10,
-      items: const [
+      items: [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
           activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          label: 'Inicio',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.warning_amber_outlined),
@@ -614,11 +612,11 @@ class _MapaPageState extends State<MapaPage> {
   void _showDiseaseSelector() {
     showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) {
-        const diseases = [
+        final diseases = [
           'Influenza-A', 'Dengue', 'COVID-19', 'Cólera', 'Malaria', 'Todas',
         ];
         return SafeArea(
@@ -626,7 +624,7 @@ class _MapaPageState extends State<MapaPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
                 child: Text(
                   'Seleccionar Enfermedad',
@@ -635,16 +633,16 @@ class _MapaPageState extends State<MapaPage> {
               ),
               ...diseases.map((d) => ListTile(
                 dense: true,
-                title: Text(d, style: const TextStyle(fontSize: 14)),
+                title: Text(d, style: TextStyle(fontSize: 14)),
                 trailing: d == _selectedDisease
-                    ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                    ? Icon(Icons.check_rounded, color: AppColors.of(context).primary)
                     : null,
                 onTap: () {
                   setState(() => _selectedDisease = d);
                   Navigator.pop(context);
                 },
               )),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
             ],
           ),
         );
@@ -655,11 +653,11 @@ class _MapaPageState extends State<MapaPage> {
   void _showPeriodSelector() {
     showModalBottomSheet<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) {
-        const periods = [
+        final periods = [
           'Últimos 7 días', 'Últimos 14 días', 'Últimos 30 días', 'Últimos 3 meses',
         ];
         return SafeArea(
@@ -667,7 +665,7 @@ class _MapaPageState extends State<MapaPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(20, 18, 20, 8),
                 child: Text(
                   'Seleccionar Período',
@@ -676,16 +674,16 @@ class _MapaPageState extends State<MapaPage> {
               ),
               ...periods.map((p) => ListTile(
                 dense: true,
-                title: Text(p, style: const TextStyle(fontSize: 14)),
+                title: Text(p, style: TextStyle(fontSize: 14)),
                 trailing: p == _selectedPeriod
-                    ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                    ? Icon(Icons.check_rounded, color: AppColors.of(context).primary)
                     : null,
                 onTap: () {
                   setState(() => _selectedPeriod = p);
                   Navigator.pop(context);
                 },
               )),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
             ],
           ),
         );
@@ -712,7 +710,7 @@ class _DistrictInfo {
   final String caseDelta;
   final double testRate;
   final List<String> recommendations;
-  const _DistrictInfo({
+  _DistrictInfo({
     required this.name,
     required this.risk,
     required this.newCases,

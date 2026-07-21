@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/constants/app_theme.dart';
 import 'core/di/injection_container_admin.dart' as di;
 import 'core/services/token_storage.dart';
 import 'features/admin/providers/admin_provider.dart';
@@ -35,19 +36,12 @@ class AdminApp extends StatelessWidget {
       child: MaterialApp(
         title: 'EpiDiagnostix Admin',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF1B6E52),
-          ),
-          fontFamily: 'Roboto',
-          cardTheme: const CardThemeData(
-            surfaceTintColor: Colors.white,
-          ),
-        ),
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.system,
         home: startAsAdmin
-            ? const AdminShellPage()
-            : const AdminLoginPage(),
+            ? AdminShellPage()
+            : AdminLoginPage(),
       ),
     );
   }

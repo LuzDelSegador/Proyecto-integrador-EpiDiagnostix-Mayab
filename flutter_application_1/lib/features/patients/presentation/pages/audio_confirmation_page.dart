@@ -19,12 +19,26 @@ class AudioConfirmationPage extends StatefulWidget {
   final Map<String, dynamic> clinicalFields;
   final String originalText;
 
-  const AudioConfirmationPage({
+  /// true cuando se abre para VER una consulta ya guardada (desde el
+  /// historial del paciente) en vez de confirmar una recién transcrita:
+  /// desactiva GPS en vivo, edición y guardado — solo lectura.
+  final bool readOnly;
+  final DateTime? fechaGuardada;
+  final bool? sincronizado;
+  final double? latitudGuardada;
+  final double? longitudGuardada;
+
+  AudioConfirmationPage({
     super.key,
     required this.pacienteId,
     required this.pacienteNombre,
     required this.clinicalFields,
     required this.originalText,
+    this.readOnly = false,
+    this.fechaGuardada,
+    this.sincronizado,
+    this.latitudGuardada,
+    this.longitudGuardada,
   });
 
   @override
@@ -79,8 +93,10 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               ? 'Femenino'
               : '',
     );
-    _comunidadController = TextEditingController(text: '');
-    _municipioController = TextEditingController(text: '');
+    _comunidadController = TextEditingController(
+        text: widget.readOnly ? (f['comunidad']?.toString() ?? '') : '');
+    _municipioController = TextEditingController(
+        text: widget.readOnly ? (f['municipio']?.toString() ?? '') : '');
 
     _categoryController   = TextEditingController(text: f['categoria_sintoma']?.toString() ?? '');
     _weightController     = TextEditingController(text: f['peso_kg']?.toString() ?? '');
@@ -91,13 +107,28 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _tempController       = TextEditingController(text: f['temperatura_c']?.toString() ?? '');
     _heartRateController  = TextEditingController(text: f['frecuencia_cardiaca_bpm']?.toString() ?? '');
     _durationController   = TextEditingController(text: f['duracion_sintomas_dias']?.toString() ?? '');
-    _saturacionController = TextEditingController(text: '');
+    _saturacionController = TextEditingController(
+        text: widget.readOnly ? (f['saturacion_oxigeno']?.toString() ?? '') : '');
 
-    _motivoController      = TextEditingController();
-    _diagnosticoController = TextEditingController();
+    _motivoController = TextEditingController(
+        text: widget.readOnly ? (f['motivo_consulta']?.toString() ?? '') : '');
+    _diagnosticoController = TextEditingController(
+        text: widget.readOnly ? (f['diagnostico_descripcion']?.toString() ?? '') : '');
 
-    _cargarComunidadPaciente();
-    _captureGps();
+    if (widget.readOnly) {
+      final medsRaw = f['medicamentos'];
+      if (medsRaw is List) {
+        _medicamentos.addAll(medsRaw
+            .whereType<Map>()
+            .map((m) => Medicamento.fromJson(Map<String, dynamic>.from(m))));
+      }
+      _latitud   = widget.latitudGuardada;
+      _longitud  = widget.longitudGuardada;
+      _gpsStatus = _latitud != null ? _GpsStatus.ready : _GpsStatus.unavailable;
+    } else {
+      _cargarComunidadPaciente();
+      _captureGps();
+    }
   }
 
   // Prellena comunidad/municipio con los datos de identidad del paciente
@@ -127,7 +158,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       }
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: Duration(seconds: 10),
       );
 
       if (!mounted) return;
@@ -160,7 +191,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         },
         options: Options(
           headers: {'User-Agent': 'EpiDiagnostix/2.0'},
-          receiveTimeout: const Duration(seconds: 8),
+          receiveTimeout: Duration(seconds: 8),
         ),
       );
 
@@ -210,40 +241,40 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
   Widget _buildGpsRow() {
     return switch (_gpsStatus) {
-      _GpsStatus.loading => const Row(
+      _GpsStatus.loading => Row(
           children: [
             SizedBox(
               width: 10,
               height: 10,
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ),
             SizedBox(width: 6),
             Text(
               'Obteniendo ubicación GPS...',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 11, color: AppColors.of(context).textMuted),
             ),
           ],
         ),
       _GpsStatus.ready => Row(
           children: [
-            const Icon(Icons.location_on, size: 12, color: AppColors.textMuted),
-            const SizedBox(width: 4),
+            Icon(Icons.location_on, size: 12, color: AppColors.of(context).textMuted),
+            SizedBox(width: 4),
             Text(
               'GPS: ${_latitud!.toStringAsFixed(4)}, ${_longitud!.toStringAsFixed(4)}',
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 11, color: AppColors.of(context).textMuted),
             ),
           ],
         ),
-      _GpsStatus.unavailable => const Row(
+      _GpsStatus.unavailable => Row(
           children: [
-            Icon(Icons.location_off, size: 12, color: AppColors.textMuted),
+            Icon(Icons.location_off, size: 12, color: AppColors.of(context).textMuted),
             SizedBox(width: 4),
             Text(
               'GPS no disponible',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 11, color: AppColors.of(context).textMuted),
             ),
           ],
         ),
@@ -351,7 +382,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
               Icon(Icons.error_outline_rounded, color: Colors.white, size: 22),
               SizedBox(width: 12),
@@ -367,11 +398,11 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFFDC2626),
+          backgroundColor: Color(0xFFDC2626),
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
       return;
@@ -381,11 +412,11 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     // Fire-and-forget: empuja lo pendiente (esta consulta y cualquier otra
     // cosa en el outbox) a MS1/MS2. Si falla, ya quedó en SQLite y se
     // reintenta en el próximo trigger.
-    sl<SyncService>().syncAll().catchError((_) => const SyncResumen());
+    sl<SyncService>().syncAll().catchError((_) => SyncResumen());
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
             Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
             SizedBox(width: 12),
@@ -401,14 +432,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             ),
           ],
         ),
-        backgroundColor: AppColors.success,
+        backgroundColor: AppColors.of(context).success,
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
+        duration: Duration(seconds: 2),
       ),
     );
-    await Future.delayed(const Duration(milliseconds: 1400));
+    await Future.delayed(Duration(milliseconds: 1400));
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
@@ -433,9 +464,9 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(mensaje),
-        backgroundColor: const Color(0xFFDC2626),
+        backgroundColor: Color(0xFFDC2626),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        margin: EdgeInsets.fromLTRB(16, 0, 16, 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -446,30 +477,30 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: _buildAppBar(),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+              padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildPageHeader(),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildPatientCard(),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   _buildClinicalCard(),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   _buildVitalsCard(),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   _buildConsultaCard(),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   _buildLocationCard(),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   _buildActionButtons(context),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                 ],
               ),
             ),
@@ -483,18 +514,17 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
       elevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.08),
-      automaticallyImplyLeading: false,
+      automaticallyImplyLeading: widget.readOnly,
       title: Row(
         children: [
-          const Icon(Icons.monitor_heart_outlined, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
-          const Text(
-            'EpiSurveillance',
+          Icon(Icons.monitor_heart_outlined, color: AppColors.of(context).primary, size: 20),
+          SizedBox(width: 8),
+          Text(
+            'EpiDiagnostix-Mayab',
             style: TextStyle(
-              color: AppColors.primary,
+              color: AppColors.of(context).primary,
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
@@ -503,16 +533,16 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: 16),
+          padding: EdgeInsets.only(right: 16),
           child: Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: AppColors.of(context).primary,
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
-            child: const Text(
+            child: Text(
               'HW',
               style: TextStyle(
                 color: Colors.white,
@@ -529,36 +559,53 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   // ── Page header ───────────────────────────────────────────────────────────
 
   Widget _buildPageHeader() {
+    final estaSincronizada = widget.sincronizado ?? false;
+    final statusColor = widget.readOnly
+        ? (estaSincronizada ? AppColors.of(context).success : AppColors.of(context).warning)
+        : AppColors.of(context).success;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Confirmación de Datos (IA)',
+        Text(
+          widget.readOnly ? 'Detalle de Consulta' : 'Confirmación de Datos (IA)',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.08),
+            color: statusColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
-              const SizedBox(width: 8),
-              const Text(
-                'Transcripción completada con éxito',
-                style: TextStyle(
-                  color: AppColors.success,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+              Icon(
+                widget.readOnly
+                    ? (estaSincronizada ? Icons.check_circle_rounded : Icons.schedule_rounded)
+                    : Icons.check_circle_rounded,
+                color: statusColor,
+                size: 16,
+              ),
+              SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  widget.readOnly
+                      ? '${_formatFecha(widget.fechaGuardada)} · ${estaSincronizada ? 'Sincronizado' : 'Pendiente de sincronizar'}'
+                      : 'Transcripción completada con éxito',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -568,6 +615,13 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     );
   }
 
+  static String _formatFecha(DateTime? dt) {
+    if (dt == null) return 'Fecha no disponible';
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
+  }
+
   // ── Card: Perfil del Paciente ─────────────────────────────────────────────
 
   Widget _buildPatientCard() {
@@ -575,54 +629,55 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       children: [
         Row(
           children: [
-            const Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
+            Icon(Icons.person_outline_rounded, color: AppColors.of(context).primary, size: 18),
+            SizedBox(width: 8),
+            Expanded(
               child: Text(
                 'Perfil del Paciente',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
             ),
-            GestureDetector(
-              onTap: _toggleEdit,
-              child: Row(
-                children: [
-                  Icon(
-                    _isEditing ? Icons.check_rounded : Icons.edit_outlined,
-                    color: AppColors.primary,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _isEditing ? 'Listo' : 'Editar',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+            if (!widget.readOnly)
+              GestureDetector(
+                onTap: _toggleEdit,
+                child: Row(
+                  children: [
+                    Icon(
+                      _isEditing ? Icons.check_rounded : Icons.edit_outlined,
+                      color: AppColors.of(context).primary,
+                      size: 14,
                     ),
-                  ),
-                ],
+                    SizedBox(width: 4),
+                    Text(
+                      _isEditing ? 'Listo' : 'Editar',
+                      style: TextStyle(
+                        color: AppColors.of(context).primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Text(
           'Nombre Completo',
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Text(
           widget.pacienteNombre,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.of(context).textPrimary),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildField('Edad', _ageController, isDetected: _detected('edad')),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildField('Género', _genderController, isDetected: _detected('sexo')),
       ],
     );
@@ -637,131 +692,136 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.biotech_outlined, color: AppColors.primary, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
+            Icon(Icons.biotech_outlined, color: AppColors.of(context).primary, size: 18),
+            SizedBox(width: 8),
+            Expanded(
               child: Text(
-                'Análisis Clínico (IA)',
+                widget.readOnly ? 'Datos Clínicos Registrados' : 'Análisis Clínico (IA)',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$detectedCount / 11\ncampos',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  height: 1.3,
+            if (!widget.readOnly)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).primary,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                textAlign: TextAlign.center,
+                child: Text(
+                  '$detectedCount / 11\ncampos',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
           ],
         ),
-        const SizedBox(height: 14),
-        const Text(
+        SizedBox(height: 14),
+        Text(
           'Categoría de Síntoma',
           style: TextStyle(
             fontSize: 12,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _isEditing
             ? _buildField('Categoría', _categoryController, isDetected: _detected('categoria_sintoma'))
             : _detected('categoria_sintoma')
                 ? _CategoryChip(label: _categoryController.text)
-                : const _UndetectedRow(label: 'Categoría no detectada'),
-        const SizedBox(height: 16),
-        const Divider(height: 1, color: Color(0xFFF3F4F6)),
-        const SizedBox(height: 14),
+                : _UndetectedRow(label: 'Categoría no detectada'),
+        SizedBox(height: 16),
+        Divider(height: 1, color: Color(0xFFF3F4F6)),
+        SizedBox(height: 14),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.thermostat_rounded, color: AppColors.primary, size: 17),
-            const SizedBox(width: 8),
+            Icon(Icons.thermostat_rounded, color: AppColors.of(context).primary, size: 17),
+            SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Temperatura (°C)',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
                   ),
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   _isEditing
                       ? _buildInlineField(_tempController)
                       : _detected('temperatura_c')
                           ? Text(
                               '${_tempController.text} °C',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: AppColors.of(context).textPrimary,
                               ),
                             )
-                          : const _UndetectedRow(label: 'No detectada'),
+                          : _UndetectedRow(label: 'No detectada'),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Duración síntomas (días)',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
                   ),
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   _isEditing
                       ? _buildInlineField(_durationController)
                       : _detected('duracion_sintomas_dias')
                           ? Text(
                               '${_durationController.text} días',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: AppColors.of(context).textPrimary,
                               ),
                             )
-                          : const _UndetectedRow(label: 'No detectada'),
+                          : _UndetectedRow(label: 'No detectada'),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.cloud_outlined, color: AppColors.textMuted, size: 17),
-            const SizedBox(width: 8),
-            const Column(
+            Icon(Icons.cloud_outlined, color: AppColors.of(context).textMuted, size: 17),
+            SizedBox(width: 8),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Estado de Sincronización',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
                 ),
                 SizedBox(height: 3),
                 Text(
-                  'Listo para envío local',
+                  widget.readOnly
+                      ? ((widget.sincronizado ?? false)
+                          ? 'Sincronizado con el servidor'
+                          : 'Pendiente de sincronizar')
+                      : 'Listo para envío local',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: AppColors.of(context).textPrimary,
                   ),
                 ),
               ],
@@ -777,21 +837,21 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   Widget _buildVitalsCard() {
     return _Card(
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.monitor_heart_outlined, color: AppColors.primary, size: 18),
+            Icon(Icons.monitor_heart_outlined, color: AppColors.of(context).primary, size: 18),
             SizedBox(width: 8),
             Text(
               'Datos Clínicos Vitales',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -799,14 +859,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               child: _buildField('Peso (kg)', _weightController,
                   isDetected: _detected('peso_kg')),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _buildField('Talla (cm)', _heightController,
                   isDetected: _detected('talla_cm')),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -814,14 +874,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               child: _buildField('Presión Sistólica', _systolicController,
                   isDetected: _detected('presion_sistolica')),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _buildField('Presión Diastólica', _diastolicController,
                   isDetected: _detected('presion_diastolica')),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -829,14 +889,14 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
               child: _buildField('Glucosa (mg/dL)', _glucoseController,
                   isDetected: _detected('glucosa_mg_dl')),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _buildField('Frec. Cardíaca (bpm)', _heartRateController,
                   isDetected: _detected('frecuencia_cardiaca_bpm')),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildField('Saturación de Oxígeno (%)', _saturacionController,
             isDetected: false, alwaysEditable: true),
       ],
@@ -848,21 +908,21 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   Widget _buildConsultaCard() {
     return _Card(
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.assignment_outlined, color: AppColors.primary, size: 18),
+            Icon(Icons.assignment_outlined, color: AppColors.of(context).primary, size: 18),
             SizedBox(width: 8),
             Text(
               'Datos de la Consulta',
-              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(color: AppColors.of(context).textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildField('Motivo de Consulta', _motivoController, isDetected: false, alwaysEditable: true),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildField('Diagnóstico', _diagnosticoController, isDetected: false, alwaysEditable: true),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _buildMedicamentosSection(),
       ],
     );
@@ -874,32 +934,33 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Medicamentos',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
             ),
-            const Spacer(),
-            GestureDetector(
-              onTap: _showAgregarMedicamentoDialog,
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.primary),
-                  SizedBox(width: 4),
-                  Text('Agregar', style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                ],
+            Spacer(),
+            if (!widget.readOnly)
+              GestureDetector(
+                onTap: _showAgregarMedicamentoDialog,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.of(context).primary),
+                    SizedBox(width: 4),
+                    Text('Agregar', style: TextStyle(fontSize: 12, color: AppColors.of(context).primary, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
         if (_medicamentos.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: _UndetectedRow(label: 'Sin medicamentos agregados'),
           )
         else
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: EdgeInsets.only(top: 8),
             child: Column(
               children: _medicamentos.asMap().entries.map((entry) {
                 final m = entry.value;
@@ -909,10 +970,10 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   if (m.duracion != null && m.duracion!.isNotEmpty) m.duracion!,
                 ].join(' · ');
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  margin: EdgeInsets.only(bottom: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.inputBackground,
+                    color: AppColors.of(context).inputBackground,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -921,16 +982,17 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(m.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            Text(m.nombre, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.of(context).textPrimary)),
                             if (partes.isNotEmpty)
-                              Text(partes, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              Text(partes, style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary)),
                           ],
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => setState(() => _medicamentos.removeAt(entry.key)),
-                        child: const Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
-                      ),
+                      if (!widget.readOnly)
+                        GestureDetector(
+                          onTap: () => setState(() => _medicamentos.removeAt(entry.key)),
+                          child: Icon(Icons.close_rounded, size: 18, color: AppColors.of(context).textMuted),
+                        ),
                     ],
                   ),
                 );
@@ -950,21 +1012,21 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     final agregado = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Agregar medicamento'),
+        title: Text('Agregar medicamento'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
-            TextField(controller: dosisCtrl, decoration: const InputDecoration(labelText: 'Dosis')),
-            TextField(controller: frecuenciaCtrl, decoration: const InputDecoration(labelText: 'Frecuencia')),
-            TextField(controller: duracionCtrl, decoration: const InputDecoration(labelText: 'Duración')),
+            TextField(controller: nombreCtrl, decoration: InputDecoration(labelText: 'Nombre')),
+            TextField(controller: dosisCtrl, decoration: InputDecoration(labelText: 'Dosis')),
+            TextField(controller: frecuenciaCtrl, decoration: InputDecoration(labelText: 'Frecuencia')),
+            TextField(controller: duracionCtrl, decoration: InputDecoration(labelText: 'Duración')),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Cancelar')),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(nombreCtrl.text.trim().isNotEmpty),
-            child: const Text('Agregar'),
+            child: Text('Agregar'),
           ),
         ],
       ),
@@ -987,27 +1049,27 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   Widget _buildLocationCard() {
     return _Card(
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
+            Icon(Icons.location_on_outlined, color: AppColors.of(context).primary, size: 18),
             SizedBox(width: 8),
             Text(
               'Ubicación de la Consulta',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildField('Municipio', _municipioController, isDetected: false, alwaysEditable: true),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _buildField('Comunidad', _comunidadController, isDetected: false, alwaysEditable: true),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         _buildGpsRow(),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: SizedBox(
@@ -1016,7 +1078,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             child: Stack(
               children: [
                 CustomPaint(
-                  size: const Size(double.infinity, 110),
+                  size: Size(double.infinity, 110),
                   painter: _MiniMapPainter(),
                 ),
                 Positioned(
@@ -1025,8 +1087,8 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
                   child: Text(
                     _latitud != null
                         ? 'GPS: ${_latitud!.toStringAsFixed(4)}, ${_longitud!.toStringAsFixed(4)}'
-                        : 'GPS: buscando...',
-                    style: const TextStyle(
+                        : (widget.readOnly ? 'GPS: no registrado' : 'GPS: buscando...'),
+                    style: TextStyle(
                       color: Colors.white54,
                       fontSize: 9,
                       letterSpacing: 0.4,
@@ -1044,6 +1106,23 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   // ── Action buttons ────────────────────────────────────────────────────────
 
   Widget _buildActionButtons(BuildContext context) {
+    if (widget.readOnly) {
+      return SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.of(context).textSecondary,
+            backgroundColor: AppColors.of(context).surface,
+            side: BorderSide(color: AppColors.of(context).border, width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          icon: Icon(Icons.arrow_back_rounded, size: 18),
+          label: Text('Cerrar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        ),
+      );
+    }
     return Column(
       children: [
         SizedBox(
@@ -1052,29 +1131,29 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
           child: ElevatedButton.icon(
             onPressed: _saveAndSync,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.of(context).primary,
               foregroundColor: Colors.white,
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            icon: const Icon(Icons.sync_rounded, size: 18),
-            label: const Text(
+            icon: Icon(Icons.sync_rounded, size: 18),
+            label: Text(
               'Guardar y Sincronizar',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
             onPressed: _toggleEdit,
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary, width: 1.5),
+              foregroundColor: AppColors.of(context).primary,
+              side: BorderSide(color: AppColors.of(context).primary, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1085,26 +1164,26 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             ),
             label: Text(
               _isEditing ? 'Confirmar Cambios' : 'Editar Manualmente',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
             onPressed: () => Navigator.of(context).pop(),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+              foregroundColor: AppColors.of(context).textSecondary,
+              backgroundColor: AppColors.of(context).surface,
+              side: BorderSide(color: AppColors.of(context).border, width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            icon: const Icon(Icons.mic_none_rounded, size: 18),
-            label: const Text(
+            icon: Icon(Icons.mic_none_rounded, size: 18),
+            label: Text(
               'Grabar de Nuevo',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
             ),
@@ -1118,54 +1197,61 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
   Widget _buildField(String label, TextEditingController controller,
       {bool isDetected = true, bool alwaysEditable = false}) {
+    // En solo-lectura ningún campo es editable, sin importar alwaysEditable;
+    // y para los campos "siempre editables" (municipio, motivo, etc.) que
+    // pasan isDetected:false porque antes era irrelevante, aquí se completa
+    // con el valor real ya cargado en el controller para no mostrarlos como
+    // "No detectado" cuando sí tienen dato guardado.
+    final mostrarEditable = (alwaysEditable || _isEditing) && !widget.readOnly;
+    final tieneValor = isDetected || controller.text.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppColors.of(context).textSecondary),
         ),
-        const SizedBox(height: 4),
-        (alwaysEditable || _isEditing)
+        SizedBox(height: 4),
+        mostrarEditable
             ? TextFormField(
                 controller: controller,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                 ),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.inputBackground,
+                  fillColor: AppColors.of(context).inputBackground,
                   contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: AppColors.primary, width: 1.5),
+                        BorderSide(color: AppColors.of(context).primary, width: 1.5),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: AppColors.primary, width: 1.5),
+                        BorderSide(color: AppColors.of(context).primary, width: 1.5),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide:
-                        const BorderSide(color: AppColors.primary, width: 2),
+                        BorderSide(color: AppColors.of(context).primary, width: 2),
                   ),
                 ),
               )
-            : isDetected
+            : tieneValor
                 ? Text(
                     controller.text,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: AppColors.of(context).textPrimary,
                     ),
                   )
-                : const _UndetectedRow(),
+                : _UndetectedRow(),
       ],
     );
   }
@@ -1174,26 +1260,26 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
   Widget _buildInlineField(TextEditingController controller) {
     return TextFormField(
       controller: controller,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: AppColors.of(context).textPrimary,
       ),
       decoration: InputDecoration(
         filled: true,
-        fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        fillColor: AppColors.of(context).inputBackground,
+        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: AppColors.of(context).primary, width: 2),
         ),
       ),
     );
@@ -1204,21 +1290,21 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
-  const _Card({required this.children});
+  _Card({required this.children});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -1234,20 +1320,20 @@ class _Card extends StatelessWidget {
 
 class _UndetectedRow extends StatelessWidget {
   final String label;
-  const _UndetectedRow({this.label = 'No detectado'});
+  _UndetectedRow({this.label = 'No detectado'});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.help_outline, size: 13, color: AppColors.textMuted),
-        const SizedBox(width: 4),
+        Icon(Icons.help_outline, size: 13, color: AppColors.of(context).textMuted),
+        SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontStyle: FontStyle.italic,
-            color: AppColors.textMuted,
+            color: AppColors.of(context).textMuted,
           ),
         ),
       ],
@@ -1259,28 +1345,28 @@ class _UndetectedRow extends StatelessWidget {
 
 class _CategoryChip extends StatelessWidget {
   final String label;
-  const _CategoryChip({required this.label});
+  _CategoryChip({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
+        color: AppColors.of(context).primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.of(context).primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.category_outlined, color: AppColors.primary, size: 15),
-          const SizedBox(width: 6),
+          Icon(Icons.category_outlined, color: AppColors.of(context).primary, size: 15),
+          SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: AppColors.of(context).primary,
             ),
           ),
         ],
@@ -1296,16 +1382,16 @@ class _MiniMapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = const Color(0xFF0D1B2A),
+      Paint()..color = Color(0xFF0D1B2A),
     );
 
     final streetPaint = Paint()
-      ..color = const Color(0xFF1B6E52).withValues(alpha: 0.5)
+      ..color = Color(0xFF1B6E52).withValues(alpha: 0.5)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
     final mainStreetPaint = Paint()
-      ..color = const Color(0xFF1B6E52).withValues(alpha: 0.8)
+      ..color = Color(0xFF1B6E52).withValues(alpha: 0.8)
       ..strokeWidth = 1.6
       ..style = PaintingStyle.stroke;
 
@@ -1333,9 +1419,9 @@ class _MiniMapPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(dotX, dotY),
       14,
-      Paint()..color = AppColors.primary.withValues(alpha: 0.18),
+      Paint()..color = Color(0xFF1B6E52).withValues(alpha: 0.18),
     );
-    canvas.drawCircle(Offset(dotX, dotY), 5, Paint()..color = AppColors.primary);
+    canvas.drawCircle(Offset(dotX, dotY), 5, Paint()..color = Color(0xFF1B6E52));
     canvas.drawCircle(
       Offset(dotX, dotY),
       5,

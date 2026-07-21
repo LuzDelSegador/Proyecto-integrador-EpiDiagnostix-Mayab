@@ -6,7 +6,7 @@ import '../../../dashboard/presentation/pages/dashboard_page.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  RegisterPage({super.key});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -50,7 +50,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (provider.status == AuthStatus.success) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        MaterialPageRoute(builder: (_) => DashboardPage()),
       );
     } else {
       setState(() => _errorText = provider.errorMessage ?? 'Error al crear la cuenta.');
@@ -60,19 +60,18 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.of(context).background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.08),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: AppColors.of(context).textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Crear Cuenta',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 17,
           ),
@@ -84,23 +83,23 @@ class _RegisterPageState extends State<RegisterPage> {
           _buildSyncBanner(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               child: Column(
                 children: [
                   _buildLogo(),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   _buildTitle(),
-                  const SizedBox(height: 28),
+                  SizedBox(height: 28),
                   _buildFormCard(),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildRegisterButton(),
                   if (_errorText != null) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     _buildErrorBanner(),
                   ],
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   _buildLoginLink(context),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                 ],
               ),
             ),
@@ -114,13 +113,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildSyncBanner() {
     return Container(
-      color: const Color(0xFF0F4C35),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      color: Color(0xFF0F4C35),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off_rounded, color: Colors.white70, size: 16),
-          const SizedBox(width: 10),
-          const Expanded(
+          Icon(Icons.wifi_off_rounded, color: Colors.white70, size: 16),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
               'Registro disponible sin conexión. Los datos se sincronizarán al detectar red.',
               style: TextStyle(color: Colors.white, fontSize: 11, height: 1.4),
@@ -144,14 +143,14 @@ class _RegisterPageState extends State<RegisterPage> {
   // ── Title + subtitle ──────────────────────────────────────────────────────
 
   Widget _buildTitle() {
-    return const Column(
+    return Column(
       children: [
         Text(
           'Crear Cuenta de Personal\nde Salud',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: AppColors.of(context).primary,
             height: 1.3,
           ),
           textAlign: TextAlign.center,
@@ -161,7 +160,7 @@ class _RegisterPageState extends State<RegisterPage> {
           'Únase a la red nacional de vigilancia epidemiológica para fortalecer la salud pública comunitaria.',
           style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             height: 1.55,
           ),
           textAlign: TextAlign.center,
@@ -174,15 +173,15 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildFormCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 18,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -192,7 +191,7 @@ class _RegisterPageState extends State<RegisterPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildFieldLabel('Nombre Completo'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _nameController,
               textCapitalization: TextCapitalization.words,
@@ -206,9 +205,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildFieldLabel('Correo Electrónico'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -223,9 +222,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildFieldLabel('Contraseña'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
@@ -238,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -248,9 +247,9 @@ class _RegisterPageState extends State<RegisterPage> {
               validator: (v) =>
                   (v == null || v.length < 8) ? 'Mínimo 8 caracteres' : null,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildFieldLabel('Confirmar Contraseña'),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             TextFormField(
               controller: _confirmController,
               obscureText: _obscureConfirm,
@@ -263,7 +262,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     _obscureConfirm
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                     size: 20,
                   ),
                   onPressed: () =>
@@ -278,7 +277,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             _buildTermsRow(),
           ],
         ),
@@ -298,44 +297,44 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Checkbox(
             value: _acceptTerms,
             onChanged: (v) => setState(() => _acceptTerms = v ?? false),
-            activeColor: AppColors.primary,
+            activeColor: AppColors.of(context).primary,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: AppColors.of(context).textSecondary,
                 height: 1.5,
               ),
               children: [
-                const TextSpan(text: 'He leído y acepto los '),
+                TextSpan(text: 'He leído y acepto los '),
                 TextSpan(
                   text: 'Términos de Servicio',
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: AppColors.of(context).primary,
                     fontWeight: FontWeight.w600,
                     decoration: TextDecoration.underline,
-                    decorationColor: AppColors.primary,
+                    decorationColor: AppColors.of(context).primary,
                   ),
                   recognizer: TapGestureRecognizer()..onTap = () {},
                 ),
-                const TextSpan(text: ' y la '),
+                TextSpan(text: ' y la '),
                 TextSpan(
                   text: 'Política de Privacidad',
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: AppColors.of(context).primary,
                     fontWeight: FontWeight.w600,
                     decoration: TextDecoration.underline,
-                    decorationColor: AppColors.primary,
+                    decorationColor: AppColors.of(context).primary,
                   ),
                   recognizer: TapGestureRecognizer()..onTap = () {},
                 ),
-                const TextSpan(
+                TextSpan(
                   text:
                       ' sobre el manejo de datos clínicos sensibles y protección de identidad del paciente.',
                 ),
@@ -356,8 +355,8 @@ class _RegisterPageState extends State<RegisterPage> {
       child: ElevatedButton.icon(
         onPressed: (_acceptTerms && !_isLoading) ? _handleRegister : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.45),
+          backgroundColor: AppColors.of(context).primary,
+          disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.45),
           foregroundColor: Colors.white,
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -365,16 +364,16 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         icon: _isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5),
               )
-            : const Icon(Icons.person_add_alt_1_rounded, size: 20),
+            : Icon(Icons.person_add_alt_1_rounded, size: 20),
         label: Text(
           _isLoading ? 'Creando cuenta...' : 'Registrarse',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -382,20 +381,20 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildErrorBanner() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEE2E2),
+        color: Color(0xFFFEE2E2),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFCA5A5)),
+        border: Border.all(color: Color(0xFFFCA5A5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
-          const SizedBox(width: 8),
+          Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 18),
+          SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorText!,
-              style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13),
+              style: TextStyle(color: Color(0xFFDC2626), fontSize: 13),
             ),
           ),
         ],
@@ -409,21 +408,21 @@ class _RegisterPageState extends State<RegisterPage> {
     return GestureDetector(
       onTap: () => Navigator.of(context).pop(),
       child: RichText(
-        text: const TextSpan(
-          style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+        text: TextSpan(
+          style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
           children: [
             TextSpan(text: 'Ya tengo una cuenta.  '),
             TextSpan(
               text: 'Iniciar Sesión',
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             TextSpan(
               text: ' →',
               style: TextStyle(
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -438,7 +437,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildFieldLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: Color(0xFF374151),
@@ -452,30 +451,30 @@ class _RegisterPageState extends State<RegisterPage> {
   }) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inputBackground,
-      prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+      fillColor: AppColors.of(context).inputBackground,
+      prefixIcon: Icon(icon, color: AppColors.of(context).textMuted, size: 20),
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error),
+        borderSide: BorderSide(color: AppColors.of(context).error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).error, width: 1.5),
       ),
     );
   }

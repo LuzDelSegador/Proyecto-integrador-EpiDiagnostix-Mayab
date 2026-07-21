@@ -5,7 +5,7 @@ import '../../providers/admin_provider.dart';
 import '../../data/admin_models.dart';
 
 class SolicitudesSection extends StatefulWidget {
-  const SolicitudesSection({super.key});
+  SolicitudesSection({super.key});
 
   @override
   State<SolicitudesSection> createState() => _SolicitudesSectionState();
@@ -46,17 +46,17 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          color: AppColors.of(context).surface,
+          padding: EdgeInsets.fromLTRB(24, 0, 24, 0),
           child: TabBar(
             controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
+            labelColor: AppColors.of(context).primary,
+            unselectedLabelColor: AppColors.of(context).textSecondary,
+            indicatorColor: AppColors.of(context).primary,
             indicatorWeight: 2.5,
-            labelStyle: const TextStyle(
+            labelStyle: TextStyle(
                 fontSize: 14, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: const TextStyle(fontSize: 14),
+            unselectedLabelStyle: TextStyle(fontSize: 14),
             tabs: _tabs
                 .map((t) => Tab(text: t.label))
                 .toList(),
@@ -67,7 +67,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
             },
           ),
         ),
-        const Divider(height: 1),
+        Divider(height: 1),
         Expanded(
           child: _buildBody(provider),
         ),
@@ -77,7 +77,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
 
   Widget _buildBody(AdminProvider provider) {
     if (provider.loadingSolicitudes) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     if (provider.solicitudesError != null) {
@@ -85,18 +85,18 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined,
-                size: 48, color: AppColors.textMuted),
-            const SizedBox(height: 12),
+            Icon(Icons.cloud_off_outlined,
+                size: 48, color: AppColors.of(context).textMuted),
+            SizedBox(height: 12),
             Text(provider.solicitudesError!,
-                style: const TextStyle(color: AppColors.textSecondary)),
-            const SizedBox(height: 16),
+                style: TextStyle(color: AppColors.of(context).textSecondary)),
+            SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => context
                   .read<AdminProvider>()
                   .loadSolicitudes(_currentEstado),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Reintentar'),
+              icon: Icon(Icons.refresh, size: 16),
+              label: Text('Reintentar'),
             ),
           ],
         ),
@@ -110,11 +110,11 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
           children: [
             Icon(Icons.assignment_outlined,
                 size: 48,
-                color: AppColors.textMuted.withValues(alpha: 0.5)),
-            const SizedBox(height: 12),
+                color: AppColors.of(context).textMuted.withValues(alpha: 0.5)),
+            SizedBox(height: 12),
             Text(
               'Sin solicitudes ${_currentEstado == 'pendiente' ? 'pendientes' : _currentEstado == 'aprobada' ? 'aprobadas' : 'rechazadas'}.',
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.of(context).textSecondary),
             ),
           ],
         ),
@@ -122,7 +122,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       itemCount: provider.solicitudes.length,
       itemBuilder: (context, index) {
         final s = provider.solicitudes[index];
@@ -140,7 +140,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Aprobar solicitud'),
+        title: Text('Aprobar solicitud'),
         content: Text(
           '¿Confirmas que verificaste la cédula ${s.numeroCedula} de '
           '${s.nombreEnCedula} en el registro de la SEP?',
@@ -148,15 +148,15 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
+              backgroundColor: AppColors.of(context).success,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sí, aprobar'),
+            child: Text('Sí, aprobar'),
           ),
         ],
       ),
@@ -170,19 +170,19 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
           .aprobarSolicitud(s.solicitudId, _currentEstado);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
                 'Solicitud aprobada. El usuario ahora tiene acceso Premium.'),
-            backgroundColor: AppColors.success,
+            backgroundColor: AppColors.of(context).success,
           ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Error al aprobar la solicitud.'),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.of(context).error,
           ),
         );
       }
@@ -197,7 +197,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rechazar solicitud'),
+        title: Text('Rechazar solicitud'),
         content: SizedBox(
           width: 440,
           child: Form(
@@ -208,16 +208,16 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
               children: [
                 Text(
                   'Solicitante: ${s.personal.nombreCompleto}',
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary),
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.of(context).textSecondary),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 TextFormField(
                   controller: motivoController,
                   autofocus: true,
                   maxLines: 3,
                   minLines: 2,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Motivo del rechazo',
                     hintText: 'Mínimo 10 caracteres',
                     border: OutlineInputBorder(),
@@ -234,11 +234,11 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
+              backgroundColor: AppColors.of(context).error,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
@@ -246,7 +246,7 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
                 Navigator.pop(ctx, motivoController.text.trim());
               }
             },
-            child: const Text('Rechazar'),
+            child: Text('Rechazar'),
           ),
         ],
       ),
@@ -261,15 +261,15 @@ class _SolicitudesSectionState extends State<SolicitudesSection>
           .rechazarSolicitud(s.solicitudId, motivo, _currentEstado);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Solicitud rechazada.')),
+          SnackBar(content: Text('Solicitud rechazada.')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Error al rechazar la solicitud.'),
-            backgroundColor: AppColors.error,
+            backgroundColor: AppColors.of(context).error,
           ),
         );
       }
@@ -285,7 +285,7 @@ class _SolicitudCard extends StatelessWidget {
   final VoidCallback onAprobar;
   final VoidCallback onRechazar;
 
-  const _SolicitudCard({
+  _SolicitudCard({
     required this.solicitud,
     required this.showActions,
     required this.onAprobar,
@@ -296,11 +296,11 @@ class _SolicitudCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: 16),
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -313,62 +313,62 @@ class _SolicitudCard extends StatelessWidget {
                     children: [
                       Text(
                         solicitud.personal.nombreCompleto,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.of(context).textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         solicitud.personal.correo,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary),
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.of(context).textSecondary),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 _RolChip(tipo: solicitud.personal.tipo),
               ],
             ),
-            const SizedBox(height: 14),
-            const Divider(height: 1),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
+            Divider(height: 1),
+            SizedBox(height: 14),
             _InfoRow(label: 'Número de cédula', value: solicitud.numeroCedula),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             _InfoRow(
                 label: 'Nombre en cédula', value: solicitud.nombreEnCedula),
             if (solicitud.especialidad != null) ...[
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               _InfoRow(
                   label: 'Especialidad', value: solicitud.especialidad!),
             ],
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             _InfoRow(
               label: 'Fecha de solicitud',
               value: _formatDate(solicitud.createdAt),
             ),
             if (solicitud.motivoRechazo != null) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.errorBackground,
+                  color: AppColors.of(context).errorBackground,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.errorBorder),
+                  border: Border.all(color: AppColors.of(context).errorBorder),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline,
-                        color: AppColors.error, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(Icons.info_outline,
+                        color: AppColors.of(context).error, size: 16),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Motivo del rechazo: ${solicitud.motivoRechazo}',
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.error),
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.of(context).error),
                       ),
                     ),
                   ],
@@ -376,26 +376,26 @@ class _SolicitudCard extends StatelessWidget {
               ),
             ],
             if (showActions) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   OutlinedButton.icon(
                     onPressed: onRechazar,
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Rechazar'),
+                    icon: Icon(Icons.close, size: 16),
+                    label: Text('Rechazar'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
+                      foregroundColor: AppColors.of(context).error,
+                      side: BorderSide(color: AppColors.of(context).error),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   ElevatedButton.icon(
                     onPressed: onAprobar,
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text('Aprobar'),
+                    icon: Icon(Icons.check, size: 16),
+                    label: Text('Aprobar'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success,
+                      backgroundColor: AppColors.of(context).success,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -417,19 +417,19 @@ class _SolicitudCard extends StatelessWidget {
 
 class _RolChip extends StatelessWidget {
   final String tipo;
-  const _RolChip({required this.tipo});
+  _RolChip({required this.tipo});
 
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (tipo) {
-      'enfermera' => ('Enfermera', AppColors.success),
-      'medico' => ('Doctor', const Color(0xFF0D9488)),
-      'admin' => ('Admin', const Color(0xFFF97316)),
-      _ => ('Free', AppColors.textSecondary),
+      'enfermera' => ('Enfermera', AppColors.of(context).success),
+      'medico' => ('Doctor', Color(0xFF0D9488)),
+      'admin' => ('Admin', Color(0xFFF97316)),
+      _ => ('Free', AppColors.of(context).textSecondary),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
@@ -447,7 +447,7 @@ class _RolChip extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
-  const _InfoRow({required this.label, required this.value});
+  _InfoRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -458,17 +458,17 @@ class _InfoRow extends StatelessWidget {
           width: 140,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
                 fontWeight: FontWeight.w500),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-                fontSize: 13, color: AppColors.textPrimary),
+            style: TextStyle(
+                fontSize: 13, color: AppColors.of(context).textPrimary),
           ),
         ),
       ],

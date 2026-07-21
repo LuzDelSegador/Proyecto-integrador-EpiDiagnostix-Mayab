@@ -5,7 +5,7 @@ import '../../auth/presentation/providers/auth_provider.dart';
 import 'admin_shell_page.dart';
 
 class AdminLoginPage extends StatefulWidget {
-  const AdminLoginPage({super.key});
+  AdminLoginPage({super.key});
 
   @override
   State<AdminLoginPage> createState() => _AdminLoginPageState();
@@ -45,7 +45,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         final auth = context.read<AuthProvider>();
         if (auth.currentUser.role == 'admin') {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const AdminShellPage()),
+            MaterialPageRoute(builder: (_) => AdminShellPage()),
           );
         } else {
           await auth.logout();
@@ -58,10 +58,10 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.of(context).background,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: SizedBox(
             width: 400,
             child: Card(
@@ -69,7 +69,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: const EdgeInsets.all(36),
+                padding: EdgeInsets.all(36),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -77,12 +77,12 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28),
                       if (_roleError != null) _buildRoleError(),
                       if (authStatus == AuthStatus.error)
                         _buildAuthError(context),
                       _label('Correo electrónico'),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _correoController,
                         keyboardType: TextInputType.emailAddress,
@@ -94,9 +94,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                             : null,
                         onFieldSubmitted: (_) => _handleLogin(),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       _label('Contraseña'),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
@@ -109,7 +109,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
-                              color: AppColors.textMuted,
+                              color: AppColors.of(context).textMuted,
                               size: 20,
                             ),
                             onPressed: () => setState(
@@ -120,14 +120,14 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                             (v == null || v.isEmpty) ? 'Ingresa tu contraseña' : null,
                         onFieldSubmitted: (_) => _handleLogin(),
                       ),
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28),
                       _buildSubmitButton(authStatus),
-                      const SizedBox(height: 20),
-                      const Center(
+                      SizedBox(height: 20),
+                      Center(
                         child: Text(
                           'EpiDiagnostix — Panel de Administración',
                           style: TextStyle(
-                              fontSize: 11, color: AppColors.textMuted),
+                              fontSize: 11, color: AppColors.of(context).textMuted),
                         ),
                       ),
                     ],
@@ -149,25 +149,25 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppColors.primary,
+            color: AppColors.of(context).primary,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(Icons.admin_panel_settings,
+          child: Icon(Icons.admin_panel_settings,
               color: Colors.white, size: 26),
         ),
-        const SizedBox(height: 16),
-        const Text(
+        SizedBox(height: 16),
+        Text(
           'Acceso Administrativo',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
+        SizedBox(height: 4),
+        Text(
           'Solo personal autorizado',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
         ),
       ],
     );
@@ -175,23 +175,23 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Widget _buildRoleError() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: 16),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.errorBackground,
+          color: AppColors.of(context).errorBackground,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.errorBorder),
+          border: Border.all(color: AppColors.of(context).errorBorder),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.block, color: AppColors.error, size: 18),
-            const SizedBox(width: 8),
+            Icon(Icons.block, color: AppColors.of(context).error, size: 18),
+            SizedBox(width: 8),
             Expanded(
               child: Text(_roleError!,
-                  style: const TextStyle(
-                      color: AppColors.error, fontSize: 13)),
+                  style: TextStyle(
+                      color: AppColors.of(context).error, fontSize: 13)),
             ),
           ],
         ),
@@ -203,22 +203,22 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     final msg = context.select<AuthProvider, String?>(
         (p) => p.errorMessage);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: 16),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.errorBackground,
+          color: AppColors.of(context).errorBackground,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.errorBorder),
+          border: Border.all(color: AppColors.of(context).errorBorder),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 18),
-            const SizedBox(width: 8),
+            Icon(Icons.error_outline, color: AppColors.of(context).error, size: 18),
+            SizedBox(width: 8),
             Expanded(
               child: Text(msg ?? 'Credenciales incorrectas.',
-                  style: const TextStyle(
-                      color: AppColors.error, fontSize: 13)),
+                  style: TextStyle(
+                      color: AppColors.of(context).error, fontSize: 13)),
             ),
           ],
         ),
@@ -234,21 +234,21 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       child: ElevatedButton(
         onPressed: loading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+          backgroundColor: AppColors.of(context).primary,
+          disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.6),
           foregroundColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
         ),
         child: loading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5),
               )
-            : const Text('Ingresar al panel',
+            : Text('Ingresar al panel',
                 style:
                     TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
       ),
@@ -257,7 +257,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Widget _label(String text) => Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Color(0xFF374151)),
@@ -266,29 +266,29 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   InputDecoration _inputDeco({required String hint, required IconData icon}) =>
       InputDecoration(
         filled: true,
-        fillColor: AppColors.inputBackground,
-        prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+        fillColor: AppColors.of(context).inputBackground,
+        prefixIcon: Icon(icon, color: AppColors.of(context).textMuted, size: 20),
         hintText: hint,
         hintStyle:
-            const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderSide: BorderSide(color: AppColors.of(context).border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderSide: BorderSide(color: AppColors.of(context).border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5)),
+                BorderSide(color: AppColors.of(context).primary, width: 1.5)),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.error)),
+            borderSide: BorderSide(color: AppColors.of(context).error)),
         focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide:
-                const BorderSide(color: AppColors.error, width: 1.5)),
+                BorderSide(color: AppColors.of(context).error, width: 1.5)),
       );
 }

@@ -14,7 +14,7 @@ import 'new_patient_selection_page.dart';
 /// POST /pacientes. Es el paso obligatorio antes de capturar cualquier
 /// consulta — la identidad ya no se resuelve por nombre.
 class PatientRegistrationPage extends StatefulWidget {
-  const PatientRegistrationPage({super.key});
+  PatientRegistrationPage({super.key});
 
   @override
   State<PatientRegistrationPage> createState() => _PatientRegistrationPageState();
@@ -106,7 +106,7 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
       // Fire-and-forget: si hay red, empuja el alta a MS1 en segundo plano.
       // Si falla (sin red, cold-start), el paciente ya quedó en SQLite y se
       // reintentará en el próximo trigger de sincronización.
-      sl<SyncService>().syncAll().catchError((_) => const SyncResumen());
+      sl<SyncService>().syncAll().catchError((_) => SyncResumen());
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -131,11 +131,11 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -143,25 +143,25 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
+                color: Color(0xFFE5E7EB),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 20),
-            const Icon(Icons.lock_outline_rounded, size: 48, color: Color(0xFFD97706)),
-            const SizedBox(height: 14),
-            const Text(
+            SizedBox(height: 20),
+            Icon(Icons.lock_outline_rounded, size: 48, color: Color(0xFFD97706)),
+            SizedBox(height: 14),
+            Text(
               'Límite del plan Free alcanzado',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 10),
-            const Text(
+            SizedBox(height: 10),
+            Text(
               'Has alcanzado el límite del plan Free (5 pacientes).\nActualiza tu plan para registros ilimitados.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 48,
@@ -169,16 +169,16 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PlanesPage()),
+                    MaterialPageRoute(builder: (_) => PlanesPage()),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.of(context).primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Ver planes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                child: Text('Ver planes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -190,18 +190,17 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.of(context).background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.08),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          icon: Icon(Icons.arrow_back, color: AppColors.of(context).primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Datos del Paciente',
-          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 17),
+          style: TextStyle(color: AppColors.of(context).primary, fontWeight: FontWeight.bold, fontSize: 17),
         ),
       ),
       body: Form(
@@ -210,17 +209,17 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Column(
                   children: [
                     _buildIdentidadCard(),
-                    const SizedBox(height: 14),
+                    SizedBox(height: 14),
                     _buildUbicacionCard(),
                     if (_errorText != null) ...[
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       _buildErrorBanner(),
                     ],
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -239,16 +238,16 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
       children: [
         _buildSectionHeader(Icons.badge_outlined, 'Identidad del Paciente'),
         _buildFieldLabel('Nombre Completo'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
           decoration: _inputDecoration('Ej. Juan Gómez'),
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el nombre completo' : null,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildFieldLabel('CURP'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _curpController,
           textCapitalization: TextCapitalization.characters,
@@ -261,7 +260,7 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
             return null;
           },
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -270,18 +269,18 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel('Fecha de Nacimiento'),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   _buildFechaField(),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildFieldLabel('Sexo'),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   _buildSexoDropdown(),
                 ],
               ),
@@ -301,7 +300,7 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
           _fechaNacimiento != null ? _formatFecha(_fechaNacimiento!) : 'Seleccionar',
           style: TextStyle(
             fontSize: 13,
-            color: _fechaNacimiento != null ? AppColors.textPrimary : AppColors.textMuted,
+            color: _fechaNacimiento != null ? AppColors.of(context).textPrimary : AppColors.of(context).textMuted,
           ),
         ),
       ),
@@ -311,17 +310,17 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
   Widget _buildSexoDropdown() {
     return DropdownButtonFormField<String>(
       initialValue: _sexo,
-      hint: const Text('Seleccionar', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+      hint: Text('Seleccionar', style: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13)),
       decoration: _inputDecoration('').copyWith(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         hintText: null,
       ),
-      items: const [
+      items: [
         DropdownMenuItem(value: kSexoHombre, child: Text('Hombre', style: TextStyle(fontSize: 13))),
         DropdownMenuItem(value: kSexoMujer, child: Text('Mujer', style: TextStyle(fontSize: 13))),
       ],
       onChanged: (v) => setState(() => _sexo = v),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted),
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.of(context).textMuted),
     );
   }
 
@@ -332,29 +331,29 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
       children: [
         _buildSectionHeader(Icons.location_on_outlined, 'Ubicación y Contacto'),
         _buildFieldLabel('Municipio'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _municipioController,
           decoration: _inputDecoration('Ej. Suchiapa'),
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el municipio' : null,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildFieldLabel('Comunidad'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _comunidadController,
           decoration: _inputDecoration('Ej. Suchiapa (opcional)'),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildFieldLabel('Lengua Materna'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _lenguaController,
           decoration: _inputDecoration('Ej. Tzotzil (opcional)'),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _buildFieldLabel('Contacto de Emergencia'),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         TextFormField(
           controller: _contactoController,
           keyboardType: TextInputType.phone,
@@ -366,18 +365,18 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
 
   Widget _buildErrorBanner() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.errorBackground,
+        color: AppColors.of(context).errorBackground,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.errorBorder),
+        border: Border.all(color: AppColors.of(context).errorBorder),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
-          const SizedBox(width: 8),
+          Icon(Icons.error_outline, color: AppColors.of(context).error, size: 18),
+          SizedBox(width: 8),
           Expanded(
-            child: Text(_errorText!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+            child: Text(_errorText!, style: TextStyle(color: AppColors.of(context).error, fontSize: 13)),
           ),
         ],
       ),
@@ -388,29 +387,29 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
 
   Widget _buildSaveButton() {
     return Container(
-      color: const Color(0xFFF0F4F8),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      color: AppColors.of(context).background,
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _handleGuardar,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.45),
+            backgroundColor: AppColors.of(context).primary,
+            disabledBackgroundColor: AppColors.of(context).primary.withValues(alpha: 0.45),
             foregroundColor: Colors.white,
             elevation: 2,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           icon: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 20, height: 20,
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                 )
-              : const Icon(Icons.save_alt_rounded, size: 20),
+              : Icon(Icons.save_alt_rounded, size: 20),
           label: Text(
             _isLoading ? 'Guardando (puede tardar si el servidor está dormido)...' : 'Continuar',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
         ),
@@ -422,14 +421,14 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
 
   Widget _buildSectionHeader(IconData icon, String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(width: 8),
+          Icon(icon, color: AppColors.of(context).primary, size: 20),
+          SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 14),
+            style: TextStyle(color: AppColors.of(context).primary, fontWeight: FontWeight.bold, fontSize: 14),
           ),
         ],
       ),
@@ -439,28 +438,28 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
   Widget _buildFieldLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF374151)),
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF374151)),
     );
   }
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       filled: true,
-      fillColor: AppColors.inputBackground,
+      fillColor: AppColors.of(context).inputBackground,
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      hintStyle: TextStyle(color: AppColors.of(context).textMuted, fontSize: 13),
+      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: AppColors.of(context).border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.of(context).primary, width: 1.5),
       ),
     );
   }
@@ -468,18 +467,18 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
 
 class _SectionCard extends StatelessWidget {
   final List<Widget> children;
-  const _SectionCard({required this.children});
+  _SectionCard({required this.children});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: Offset(0, 2)),
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),

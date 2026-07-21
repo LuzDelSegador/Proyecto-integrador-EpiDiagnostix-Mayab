@@ -302,6 +302,33 @@ class PatientLocalRepository {
     ''');
   }
 
+  /// Progreso real de sincronización de consultas: total capturadas en este
+  /// dispositivo vs. cuántas ya subieron a MS2. Reemplaza el "82/87" fijo del
+  /// dashboard — cuenta directamente sobre SQLite, sin llamar a la red.
+  Future<SyncStats> getConsultasSyncStats() async {
+    final db = await _database;
+    final totalRow = await db.rawQuery('SELECT COUNT(*) AS c FROM $_tConsultas');
+    final syncRow = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $_tConsultas WHERE sincronizado = 1',
+    );
+    return SyncStats(
+      total: totalRow.first['c'] as int,
+      sincronizadas: syncRow.first['c'] as int,
+    );
+  }
+
+  /// Cuenta consultas capturadas en la ventana [desde, hasta). Se usa dos
+  /// veces desde el dashboard (últimas 24h y las 24h previas) para armar el
+  /// indicador "Casos Nuevos (24h)" con su comparación vs. período anterior.
+  Future<int> contarConsultasEntre(DateTime desde, DateTime hasta) async {
+    final db = await _database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $_tConsultas WHERE fecha_captura >= ? AND fecha_captura < ?',
+      [desde.toIso8601String(), hasta.toIso8601String()],
+    );
+    return rows.first['c'] as int;
+  }
+
   Paciente _pacienteFromRow(Map<String, dynamic> r) => Paciente(
         id:                 r['id'] as String,
         nombreCompleto:     r['nombre_completo'] as String,
@@ -383,6 +410,8 @@ class PatientLocalRepository {
         categoriaSintoma:  campos['categoria_sintoma'] as String?,
         camposExtraidos:   campos,
         sincronizado:      (r['sincronizado'] as int) == 1,
+        latitud:           _toDouble(r['latitud']),
+        longitud:          _toDouble(r['longitud']),
       );
     }).toList();
   }
@@ -412,4 +441,13 @@ class PatientLocalRepository {
 
   static int? _toInt(dynamic v) =>
       v == null ? null : int.tryParse(v.toString());
+}
+
+class SyncStats {
+  final int total;
+  final int sincronizadas;
+
+  const SyncStats({required this.total, required this.sincronizadas});
+
+  double get progreso => total == 0 ? 1.0 : sincronizadas / total;
 }

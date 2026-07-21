@@ -7,7 +7,7 @@ import '../../data/admin_models.dart';
 class DashboardSection extends StatefulWidget {
   final VoidCallback onGoToSolicitudes;
 
-  const DashboardSection({super.key, required this.onGoToSolicitudes});
+  DashboardSection({super.key, required this.onGoToSolicitudes});
 
   @override
   State<DashboardSection> createState() => _DashboardSectionState();
@@ -27,7 +27,7 @@ class _DashboardSectionState extends State<DashboardSection> {
     final provider = context.watch<AdminProvider>();
 
     if (provider.loadingStats) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     if (provider.statsError != null) {
@@ -39,13 +39,13 @@ class _DashboardSectionState extends State<DashboardSection> {
 
     final stats = provider.stats;
     if (stats == null) {
-      return const Center(
-        child: Text('Sin datos', style: TextStyle(color: AppColors.textMuted)),
+      return Center(
+        child: Text('Sin datos', style: TextStyle(color: AppColors.of(context).textMuted)),
       );
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -54,9 +54,9 @@ class _DashboardSectionState extends State<DashboardSection> {
               count: stats.solicitudesPendientes,
               onTap: widget.onGoToSolicitudes,
             ),
-          if (stats.solicitudesPendientes > 0) const SizedBox(height: 20),
+          if (stats.solicitudesPendientes > 0) SizedBox(height: 20),
           _buildStatsRow(stats),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _ApprovedToday(count: stats.solicitudesAprobadasHoy),
         ],
       ),
@@ -72,25 +72,25 @@ class _DashboardSectionState extends State<DashboardSection> {
           label: 'Total usuarios',
           value: stats.totalUsuarios,
           icon: Icons.people,
-          color: AppColors.info,
+          color: AppColors.of(context).info,
         ),
         _StatCard(
           label: 'Enfermeras',
           value: stats.porRol['enfermera'] ?? 0,
           icon: Icons.medical_services,
-          color: AppColors.success,
+          color: AppColors.of(context).success,
         ),
         _StatCard(
           label: 'Doctores',
           value: stats.porRol['medico'] ?? 0,
           icon: Icons.local_hospital,
-          color: const Color(0xFF0D9488),
+          color: Color(0xFF0D9488),
         ),
         _StatCard(
           label: 'Solicitudes pendientes',
           value: stats.solicitudesPendientes,
           icon: Icons.assignment_late,
-          color: AppColors.warning,
+          color: AppColors.of(context).warning,
           showAlert: stats.solicitudesPendientes > 0,
         ),
       ],
@@ -102,40 +102,40 @@ class _PendingBanner extends StatelessWidget {
   final int count;
   final VoidCallback onTap;
 
-  const _PendingBanner({required this.count, required this.onTap});
+  _PendingBanner({required this.count, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFEF9C3),
+        color: Color(0xFFFEF9C3),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFF59E0B)),
+        border: Border.all(color: Color(0xFFF59E0B)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded,
+          Icon(Icons.warning_amber_rounded,
               color: Color(0xFFF59E0B), size: 20),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'Hay $count ${count == 1 ? 'solicitud pendiente' : 'solicitudes pendientes'} de revisión.',
-              style: const TextStyle(
+              style: TextStyle(
                   color: Color(0xFF92400E),
                   fontSize: 13,
                   fontWeight: FontWeight.w500),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           TextButton(
             onPressed: onTap,
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF92400E),
-              textStyle: const TextStyle(
+              foregroundColor: Color(0xFF92400E),
+              textStyle: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600),
             ),
-            child: const Text('Revisar ahora →'),
+            child: Text('Revisar ahora →'),
           ),
         ],
       ),
@@ -150,7 +150,7 @@ class _StatCard extends StatelessWidget {
   final Color color;
   final bool showAlert;
 
-  const _StatCard({
+  _StatCard({
     required this.label,
     required this.value,
     required this.icon,
@@ -167,7 +167,7 @@ class _StatCard extends StatelessWidget {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -183,26 +183,26 @@ class _StatCard extends StatelessWidget {
                     child: Icon(icon, color: color, size: 22),
                   ),
                   if (showAlert) ...[
-                    const SizedBox(width: 8),
-                    const Icon(Icons.circle, color: AppColors.error, size: 10),
+                    SizedBox(width: 8),
+                    Icon(Icons.circle, color: AppColors.of(context).error, size: 10),
                   ],
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               Text(
                 '$value',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 label,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 13, color: AppColors.of(context).textSecondary),
               ),
             ],
           ),
@@ -214,19 +214,19 @@ class _StatCard extends StatelessWidget {
 
 class _ApprovedToday extends StatelessWidget {
   final int count;
-  const _ApprovedToday({required this.count});
+  _ApprovedToday({required this.count});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.check_circle_outline,
-            color: AppColors.success, size: 18),
-        const SizedBox(width: 8),
+        Icon(Icons.check_circle_outline,
+            color: AppColors.of(context).success, size: 18),
+        SizedBox(width: 8),
         Text(
           'Solicitudes aprobadas hoy: $count',
-          style: const TextStyle(
-              fontSize: 14, color: AppColors.textSecondary),
+          style: TextStyle(
+              fontSize: 14, color: AppColors.of(context).textSecondary),
         ),
       ],
     );
@@ -237,7 +237,7 @@ class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
 
-  const _ErrorView({required this.message, required this.onRetry});
+  _ErrorView({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -245,16 +245,16 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_outlined,
-              size: 48, color: AppColors.textMuted),
-          const SizedBox(height: 12),
+          Icon(Icons.cloud_off_outlined,
+              size: 48, color: AppColors.of(context).textMuted),
+          SizedBox(height: 12),
           Text(message,
-              style: const TextStyle(color: AppColors.textSecondary)),
-          const SizedBox(height: 16),
+              style: TextStyle(color: AppColors.of(context).textSecondary)),
+          SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Reintentar'),
+            icon: Icon(Icons.refresh, size: 16),
+            label: Text('Reintentar'),
           ),
         ],
       ),

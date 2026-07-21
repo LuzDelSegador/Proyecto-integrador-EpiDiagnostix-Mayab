@@ -7,7 +7,7 @@ class UpgradeRequiredWidget extends StatelessWidget {
   final String description;
   final VoidCallback onVerPlanes;
 
-  const UpgradeRequiredWidget({
+  UpgradeRequiredWidget({
     super.key,
     required this.featureName,
     required this.requiredPlan,
@@ -19,7 +19,7 @@ class UpgradeRequiredWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -27,67 +27,67 @@ class UpgradeRequiredWidget extends StatelessWidget {
               width: 88,
               height: 88,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: AppColors.of(context).primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.lock_outline_rounded,
                 size: 44,
-                color: AppColors.primary,
+                color: AppColors.of(context).primary,
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Text(
               featureName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: AppColors.of(context).textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 'Requiere $requiredPlan',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFFD97706),
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Text(
               description,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: AppColors.of(context).textSecondary,
                 height: 1.55,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: onVerPlanes,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.of(context).primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                icon: const Icon(Icons.star_outline_rounded, size: 18),
-                label: const Text(
+                icon: Icon(Icons.star_outline_rounded, size: 18),
+                label: Text(
                   'Ver planes',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),

@@ -10,7 +10,7 @@ class NewPatientSelectionPage extends StatelessWidget {
   final String pacienteId;
   final String pacienteNombre;
 
-  const NewPatientSelectionPage({
+  NewPatientSelectionPage({
     super.key,
     required this.pacienteId,
     required this.pacienteNombre,
@@ -19,13 +19,13 @@ class NewPatientSelectionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.of(context).background,
       // Barra superior oscura (consistente con la página de login)
       appBar: AppBar(
-        backgroundColor: AppColors.statusBarBackground,
+        backgroundColor: AppColors.of(context).statusBarBackground,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text(
+        title: Text(
           'Selección de Entrada de Datos',
           style: TextStyle(color: Colors.white, fontSize: 13),
         ),
@@ -34,26 +34,26 @@ class NewPatientSelectionPage extends StatelessWidget {
       body: Column(
         children: [
           _buildSecondaryHeader(context),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+          Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMethodHeader(),
-                  const SizedBox(height: 24),
+                  _buildMethodHeader(context),
+                  SizedBox(height: 24),
                   _buildWriteCard(context),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildAudioCard(context),
-                  const SizedBox(height: 20),
-                  _buildRecommendationBox(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 20),
+                  _buildRecommendationBox(context),
+                  SizedBox(height: 24),
                 ],
               ),
             ),
           ),
-          _buildFooter(),
+          _buildFooter(context),
         ],
       ),
     );
@@ -63,29 +63,29 @@ class NewPatientSelectionPage extends StatelessWidget {
 
   Widget _buildSecondaryHeader(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      color: AppColors.of(context).surface,
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.close, color: AppColors.textPrimary, size: 22),
+            child: Icon(Icons.close, color: AppColors.of(context).textPrimary, size: 22),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Text(
               pacienteNombre,
-              style: const TextStyle(
-                color: AppColors.primary,
+              style: TextStyle(
+                color: AppColors.of(context).primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Icon(
+          Icon(
             Icons.cloud_outlined,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             size: 22,
           ),
         ],
@@ -95,8 +95,8 @@ class NewPatientSelectionPage extends StatelessWidget {
 
   // ── Method header ─────────────────────────────────────────────────────────
 
-  Widget _buildMethodHeader() {
-    return const Column(
+  Widget _buildMethodHeader(BuildContext context) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -104,7 +104,7 @@ class NewPatientSelectionPage extends StatelessWidget {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: AppColors.of(context).textPrimary,
           ),
         ),
         SizedBox(height: 8),
@@ -112,7 +112,7 @@ class NewPatientSelectionPage extends StatelessWidget {
           'Seleccione cómo desea capturar los datos epidemiológicos de esta consulta.',
           style: TextStyle(
             fontSize: 13,
-            color: AppColors.textSecondary,
+            color: AppColors.of(context).textSecondary,
             height: 1.5,
           ),
           textAlign: TextAlign.left,
@@ -126,18 +126,18 @@ class NewPatientSelectionPage extends StatelessWidget {
   Widget _buildWriteCard(BuildContext context) {
     return _OptionCard(
       iconData: Icons.keyboard_rounded,
-      iconBackgroundColor: AppColors.primary,
+      iconBackgroundColor: AppColors.of(context).primary,
       title: 'Escribir datos del paciente',
       description:
           'Formulario manual estructurado para una precisión clínica detallada.',
       linkLabel: 'Empezar ahora',
-      linkTrailing: const Icon(Icons.arrow_forward, size: 16, color: AppColors.primary),
+      linkTrailing: Icon(Icons.arrow_forward, size: 16, color: AppColors.of(context).primary),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => AudioConfirmationPage(
             pacienteId: pacienteId,
             pacienteNombre: pacienteNombre,
-            clinicalFields: const {},
+            clinicalFields: {},
             originalText: '',
           ),
         ),
@@ -150,12 +150,12 @@ class NewPatientSelectionPage extends StatelessWidget {
   Widget _buildAudioCard(BuildContext context) {
     return _OptionCard(
       iconData: Icons.mic_rounded,
-      iconBackgroundColor: const Color(0xFF0EA5E9),
+      iconBackgroundColor: Color(0xFF0EA5E9),
       title: 'Transcribir con audio',
       description:
           'Captura rápida mediante voz. Ideal para triaje en entornos de alta presión.',
       linkLabel: 'Iniciar grabación',
-      linkTrailing: const Icon(Icons.graphic_eq, size: 18, color: AppColors.primary),
+      linkTrailing: Icon(Icons.graphic_eq, size: 18, color: AppColors.of(context).primary),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => AudioTranscriptionPage(
@@ -169,25 +169,25 @@ class NewPatientSelectionPage extends StatelessWidget {
 
   // ── Recommendation box ────────────────────────────────────────────────────
 
-  Widget _buildRecommendationBox() {
+  Widget _buildRecommendationBox(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.infoBackground,
+        color: AppColors.of(context).infoBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.infoBorder),
+        border: Border.all(color: AppColors.of(context).infoBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.info_outline, color: AppColors.info, size: 17),
-              const SizedBox(width: 8),
+              Icon(Icons.info_outline, color: AppColors.of(context).info, size: 17),
+              SizedBox(width: 8),
               Text(
                 'RECOMENDACIÓN',
                 style: TextStyle(
-                  color: AppColors.info.withValues(alpha: 0.9),
+                  color: AppColors.of(context).info.withValues(alpha: 0.9),
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.6,
@@ -195,8 +195,8 @@ class NewPatientSelectionPage extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'La transcripción por audio se recomienda para entrevistas iniciales. Los datos se sincronizarán automáticamente cuando recupere la conexión.',
             style: TextStyle(
               color: Color(0xFF1D4ED8),
@@ -211,30 +211,30 @@ class NewPatientSelectionPage extends StatelessWidget {
 
   // ── Footer ────────────────────────────────────────────────────────────────
 
-  Widget _buildFooter() {
+  Widget _buildFooter(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      color: AppColors.of(context).surface,
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.check_circle_outline, color: AppColors.success, size: 15),
+              Icon(Icons.check_circle_outline, color: AppColors.of(context).success, size: 15),
               SizedBox(width: 5),
               Text(
                 'Modo Offline: Activo',
                 style: TextStyle(
-                  color: AppColors.success,
+                  color: AppColors.of(context).success,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const Text(
+          Text(
             'Versión v2.4.0-offline',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: AppColors.of(context).textMuted, fontSize: 11),
           ),
         ],
       ),
@@ -253,7 +253,7 @@ class _OptionCard extends StatelessWidget {
   final Widget linkTrailing;
   final VoidCallback onTap;
 
-  const _OptionCard({
+  _OptionCard({
     required this.iconData,
     required this.iconBackgroundColor,
     required this.title,
@@ -266,16 +266,16 @@ class _OptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        border: Border.all(color: AppColors.of(context).border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
-            offset: const Offset(0, 3),
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -291,33 +291,33 @@ class _OptionCard extends StatelessWidget {
             ),
             child: Icon(iconData, color: Colors.white, size: 30),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           // Title
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
               height: 1.3,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           // Description
           Text(
             description,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: AppColors.of(context).textSecondary,
               height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           // Divider
-          const Divider(height: 1, color: Color(0xFFF3F4F6)),
-          const SizedBox(height: 14),
+          Divider(height: 1, color: Color(0xFFF3F4F6)),
+          SizedBox(height: 14),
           // Link row
           GestureDetector(
             onTap: onTap,
@@ -326,13 +326,13 @@ class _OptionCard extends StatelessWidget {
               children: [
                 Text(
                   linkLabel,
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: AppColors.of(context).primary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 linkTrailing,
               ],
             ),

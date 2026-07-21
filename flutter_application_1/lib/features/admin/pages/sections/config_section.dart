@@ -4,35 +4,35 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_config.dart';
 
 class ConfigSection extends StatelessWidget {
-  const ConfigSection({super.key});
+  ConfigSection({super.key});
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Configuración del sistema',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: AppColors.of(context).textPrimary,
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
+          SizedBox(height: 4),
+          Text(
             'Para modificar estos valores, edita app_config.dart y recompila el panel.',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -42,14 +42,14 @@ class ConfigSection extends StatelessWidget {
                     icon: Icons.dns_outlined,
                     onCopy: () => _copy(context, kBaseUrlAuth, 'URL copiada'),
                   ),
-                  const Divider(height: 28),
+                  Divider(height: 28),
                   _ConfigItem(
                     label: 'Backend MS2 (NER / Isolation Forest)',
                     value: kBaseUrlML,
                     icon: Icons.psychology_outlined,
                     onCopy: () => _copy(context, kBaseUrlML, 'URL copiada'),
                   ),
-                  const Divider(height: 28),
+                  Divider(height: 28),
                   _ConfigItem(
                     label: 'Clave Stripe (test)',
                     value: kStripePublishableKey,
@@ -62,25 +62,25 @@ class ConfigSection extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.infoBackground,
+              color: AppColors.of(context).infoBackground,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.infoBorder),
+              border: Border.all(color: AppColors.of(context).infoBorder),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, color: AppColors.info, size: 18),
+                Icon(Icons.info_outline, color: AppColors.of(context).info, size: 18),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Los cambios de configuración requieren recompilar el panel '
                     '(flutter build web --target lib/main_admin.dart) y volver a '
                     'desplegar los archivos en el servidor.',
-                    style: TextStyle(fontSize: 13, color: AppColors.info),
+                    style: TextStyle(fontSize: 13, color: AppColors.of(context).info),
                   ),
                 ),
               ],
@@ -96,7 +96,7 @@ class ConfigSection extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(label),
-        duration: const Duration(seconds: 2),
+        duration: Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         width: 240,
       ),
@@ -111,7 +111,7 @@ class _ConfigItem extends StatelessWidget {
   final VoidCallback onCopy;
   final bool monospace;
 
-  const _ConfigItem({
+  _ConfigItem({
     required this.label,
     required this.value,
     required this.icon,
@@ -128,30 +128,30 @@ class _ConfigItem extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: AppColors.of(context).primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
+          child: Icon(icon, color: AppColors.of(context).primary, size: 20),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.3),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               SelectableText(
                 value,
                 style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textPrimary,
+                  color: AppColors.of(context).textPrimary,
                   fontFamily: monospace ? 'monospace' : null,
                 ),
               ),
@@ -160,9 +160,9 @@ class _ConfigItem extends StatelessWidget {
         ),
         IconButton(
           onPressed: onCopy,
-          icon: const Icon(Icons.copy_outlined, size: 18),
+          icon: Icon(Icons.copy_outlined, size: 18),
           tooltip: 'Copiar',
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
         ),
       ],
     );
