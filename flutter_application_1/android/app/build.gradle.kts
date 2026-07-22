@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 
 @Suppress("DEPRECATION")
 android {
-    namespace = "com.epidiagnostix.kloter2"
+    namespace = "com.epidiagnostix.kloter3"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 
@@ -26,7 +26,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.epidiagnostix.kloter2"
+        applicationId = "com.epidiagnostix.kloter3"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
