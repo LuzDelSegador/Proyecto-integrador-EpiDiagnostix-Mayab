@@ -1,4 +1,4 @@
-package com.epidiagnostix.kloter2
+package com.epidiagnostix.kloter3
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
