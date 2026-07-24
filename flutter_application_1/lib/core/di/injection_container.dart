@@ -3,6 +3,7 @@ import '../network/dio_client.dart';
 import '../services/token_storage.dart';
 import '../services/tflite_extractor.dart';
 import '../services/device_id_service.dart';
+import '../services/llm_normalization_service.dart';
 import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/i_auth_repository.dart';
@@ -14,6 +15,7 @@ import '../../features/patients/data/datasources/personal_remote_datasource.dart
 import '../../features/patients/data/repositories/patient_local_repository.dart';
 import '../../features/attentions/data/datasources/atencion_remote_datasource.dart';
 import '../../features/anomalies/data/anomaly_service.dart';
+import '../../features/patients/data/patient_history_summary_service.dart';
 import '../../features/plans/data/plan_service.dart';
 import '../../features/sync/data/sync_service.dart';
 
@@ -57,4 +59,6 @@ Future<void> init() async {
       labelsAsset: 'assets/model/tflite_labels_v2.json',
     ),
   );
+  sl.registerLazySingleton(() => LlmNormalizationService());
+  sl.registerLazySingleton(() => PatientHistorySummaryService());
 }

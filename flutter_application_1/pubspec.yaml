@@ -2,7 +2,7 @@ name: flutter_application_1
 description: "EpiDiagnostix-Mayab - Portal de Vigilancia Epidemiológica"
 publish_to: 'none'
 
-version: 2.4.1+2
+version: 3.0.0+3
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -28,6 +28,7 @@ dependencies:
   flutter_stripe: ^10.2.0
   geolocator: ^10.1.0
   connectivity_plus: ^6.1.0
+  flutter_dotenv: ^5.2.1
 
 dependency_overrides:
   record_linux:
@@ -52,3 +53,4 @@ flutter:
   assets:
     - assets/images/
     - assets/model/
+    - .env

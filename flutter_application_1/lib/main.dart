@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/app_config.dart';
@@ -15,6 +16,13 @@ import 'features/sync/data/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env no está presente (ej. instalación limpia sin claves de IA
+    // configuradas) — las funciones de LLM quedan deshabilitadas, el resto
+    // de la app sigue funcionando con normalidad.
+  }
   Stripe.publishableKey = kStripePublishableKey;
   // applySettings() es opcional: Stripe aplica la clave de forma lazy en el
   // primer uso del PaymentSheet. No llamarla aquí evita bloquear el arranque

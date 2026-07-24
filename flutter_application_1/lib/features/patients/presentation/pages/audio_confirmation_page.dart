@@ -19,6 +19,10 @@ class AudioConfirmationPage extends StatefulWidget {
   final Map<String, dynamic> clinicalFields;
   final String originalText;
 
+  /// true cuando [originalText] fue normalizado por el LLM (Groq/Qwen) antes
+  /// del extractor BiLSTM — se muestra como indicador de transparencia.
+  final bool normalizadoPorLlm;
+
   /// true cuando se abre para VER una consulta ya guardada (desde el
   /// historial del paciente) en vez de confirmar una recién transcrita:
   /// desactiva GPS en vivo, edición y guardado — solo lectura.
@@ -34,6 +38,7 @@ class AudioConfirmationPage extends StatefulWidget {
     required this.pacienteNombre,
     required this.clinicalFields,
     required this.originalText,
+    this.normalizadoPorLlm = false,
     this.readOnly = false,
     this.fechaGuardada,
     this.sincronizado,
@@ -338,6 +343,7 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
       campos.remove('medicamentos');
     }
     campos['personal_id'] = personalId;
+    campos['normalizado_por_llm'] = widget.normalizadoPorLlm;
 
     return campos;
   }
@@ -611,6 +617,39 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
             ],
           ),
         ),
+        if (widget.normalizadoPorLlm) ...[
+          SizedBox(height: 8),
+          Tooltip(
+            message:
+                'El texto fue normalizado automáticamente por IA (vocabulario '
+                'clínico coloquial → términos técnicos) antes del análisis.',
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.of(context).primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.of(context).primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_rounded,
+                      size: 14, color: AppColors.of(context).primary),
+                  SizedBox(width: 6),
+                  Text(
+                    'Texto normalizado por IA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.of(context).primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../data/models/paciente.dart';
+import '../../data/patient_history_summary_service.dart';
 import '../../data/repositories/patient_local_repository.dart';
 import 'audio_confirmation_page.dart';
 import 'new_patient_selection_page.dart';
@@ -16,17 +20,52 @@ class PacienteDetallePage extends StatefulWidget {
 
 class _PacienteDetallePageState extends State<PacienteDetallePage> {
   List<ConsultaResumen>? _consultas;
+  bool _online = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _checkConnectivity();
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final online = results.any((r) => r != ConnectivityResult.none);
+      if (mounted) setState(() => _online = online);
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectivitySub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
     final lista = await sl<PatientLocalRepository>()
         .getConsultasDePaciente(widget.paciente.paciente.id);
     if (mounted) setState(() => _consultas = lista);
+  }
+
+  Future<void> _checkConnectivity() async {
+    final results = await Connectivity().checkConnectivity();
+    final online = results.any((r) => r != ConnectivityResult.none);
+    if (mounted) setState(() => _online = online);
+  }
+
+  void _showResumenIA() {
+    final p = widget.paciente.paciente;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.of(context).surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ResumenIASheet(
+        pacienteNombre: p.nombreCompleto,
+        consultas: _consultas ?? [],
+      ),
+    );
   }
 
   @override
@@ -84,6 +123,16 @@ class _PacienteDetallePageState extends State<PacienteDetallePage> {
       expandedHeight: 195,
       pinned: true,
       actions: [
+        IconButton(
+          icon: Icon(Icons.auto_awesome_rounded,
+              color: _online ? Colors.white : Colors.white38),
+          tooltip: _online
+              ? 'Resumir historial con IA'
+              : 'Requiere conexión a internet',
+          onPressed: (_online && (_consultas?.isNotEmpty ?? false))
+              ? _showResumenIA
+              : null,
+        ),
         IconButton(
           icon: Icon(Icons.badge_outlined, color: Colors.white),
           tooltip: 'Ver perfil completo',
@@ -183,6 +232,7 @@ class _PacienteDetallePageState extends State<PacienteDetallePage> {
             pacienteNombre: p.nombreCompleto,
             clinicalFields: c.camposExtraidos,
             originalText: c.textoOriginal,
+            normalizadoPorLlm: c.camposExtraidos['normalizado_por_llm'] == true,
             readOnly: true,
             fechaGuardada: c.fechaCaptura,
             sincronizado: c.sincronizado,
@@ -408,6 +458,158 @@ class _CategoryBadge extends StatelessWidget {
           color: AppColors.of(context).primary,
           fontSize: 11,
           fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Resumen de historial con IA (bottom sheet) ─────────────────────────────────
+
+class _ResumenIASheet extends StatefulWidget {
+  final String pacienteNombre;
+  final List<ConsultaResumen> consultas;
+  const _ResumenIASheet({required this.pacienteNombre, required this.consultas});
+
+  @override
+  State<_ResumenIASheet> createState() => _ResumenIASheetState();
+}
+
+class _ResumenIASheetState extends State<_ResumenIASheet> {
+  bool _loading = true;
+  bool _error = false;
+  String? _resumen;
+
+  @override
+  void initState() {
+    super.initState();
+    _generar();
+  }
+
+  Future<void> _generar() async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final resumen = await sl<PatientHistorySummaryService>().summarize(
+        pacienteNombre: widget.pacienteNombre,
+        consultas: widget.consultas,
+      );
+      if (!mounted) return;
+      setState(() {
+        _resumen = resumen;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded,
+                    color: AppColors.of(context).primary, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Resumen con IA',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.of(context).textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 4),
+            Text(
+              widget.pacienteNombre,
+              style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
+            ),
+            SizedBox(height: 16),
+            if (_loading)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text(
+                        'Generando resumen...',
+                        style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (_error)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    Icon(Icons.cloud_off_rounded,
+                        size: 32, color: AppColors.of(context).textMuted),
+                    SizedBox(height: 8),
+                    Text(
+                      'No se pudo generar el resumen, intenta de nuevo con mejor conexión.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.of(context).textSecondary),
+                    ),
+                    SizedBox(height: 12),
+                    OutlinedButton(onPressed: _generar, child: Text('Reintentar')),
+                  ],
+                ),
+              )
+            else
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Text(
+                    _resumen ?? '',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: AppColors.of(context).textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Cerrar'),
+              ),
+            ),
+          ],
         ),
       ),
     );

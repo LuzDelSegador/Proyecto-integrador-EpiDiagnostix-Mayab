@@ -10,6 +10,7 @@ import 'package:whisper_flutter_new/whisper_flutter_new.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/user_roles.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/services/llm_normalization_service.dart';
 import '../../../../core/services/tflite_extractor.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import 'audio_confirmation_page.dart';
@@ -219,16 +220,22 @@ class _AudioTranscriptionPageState extends State<AudioTranscriptionPage> {
   Future<void> _analyzeText(String text) async {
     setState(() => _isProcessing = true);
     try {
+      // Normalización de vocabulario coloquial vía LLM antes del BiLSTM.
+      // Nunca bloquea: sin conexión, timeout o error del LLM, sigue con el
+      // texto original tal cual (ver LlmNormalizationService).
+      final normalization = await sl<LlmNormalizationService>().normalize(text);
+
       final extractor = sl<NerExtractor>();
-      final fields = await Future(() => extractor.infer(text));
+      final fields = await Future(() => extractor.infer(normalization.text));
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => AudioConfirmationPage(
             pacienteId: widget.pacienteId,
             pacienteNombre: widget.pacienteNombre,
-            originalText: text,
+            originalText: normalization.text,
             clinicalFields: fields,
+            normalizadoPorLlm: normalization.normalizado,
           ),
         ),
       );
