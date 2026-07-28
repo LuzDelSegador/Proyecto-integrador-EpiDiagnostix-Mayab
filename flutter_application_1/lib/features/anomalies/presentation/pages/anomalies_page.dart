@@ -173,12 +173,13 @@ class _AnomaliesPageState extends State<AnomaliesPage> {
                           child: RichText(
                             text: TextSpan(
                               style: TextStyle(
-                                  color: Colors.black87, fontSize: 13),
+                                  color: AppColors.of(context).textPrimary, fontSize: 13),
                               children: [
                                 TextSpan(
                                   text: '${e.key}: ',
                                   style: TextStyle(
-                                      fontWeight: FontWeight.bold),
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.of(context).textSecondary),
                                 ),
                                 TextSpan(text: e.value),
                               ],
