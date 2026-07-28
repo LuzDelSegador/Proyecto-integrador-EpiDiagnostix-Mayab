@@ -4,11 +4,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/user_roles.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/widgets/upgrade_required_widget.dart';
 import '../../../anomalies/presentation/pages/anomalies_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cases/presentation/pages/casos_page.dart';
+import '../../../patients/data/models/paciente.dart';
+import '../../../patients/data/repositories/patient_local_repository.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../services/presentation/pages/servicios_page.dart';
 
@@ -25,27 +28,46 @@ class _MapaPageState extends State<MapaPage> {
 
   String _selectedDisease = 'Influenza-A';
   String _selectedPeriod = 'Últimos 14 días';
-  _DistrictInfo? _selectedDistrict = _DistrictInfo(
-    name: 'Distrito 7-A',
-    risk: _RiskLevel.high,
-    newCases: 42,
-    caseDelta: '+12',
-    testRate: 8.4,
-    recommendations: [
-      'Desplegar unidad móvil de pruebas en Sector B.',
-      'Priorizar distribución de refuerzos de vacuna.',
-    ],
-  );
 
-  static final _center = LatLng(14.6349, -90.5069);
+  bool _cargando = true;
+  List<ConsultaConUbicacion> _consultas = [];
+  List<ResumenComunidad> _resumenComunidades = [];
+  ConsultaConUbicacion? _seleccionada;
 
-  static final _hotspots = <_Hotspot>[
-    _Hotspot(point: LatLng(14.6349, -90.5069), radius: 800, level: _RiskLevel.high),
-    _Hotspot(point: LatLng(14.6500, -90.4900), radius: 500, level: _RiskLevel.medium),
-    _Hotspot(point: LatLng(14.6200, -90.5300), radius: 400, level: _RiskLevel.medium),
-    _Hotspot(point: LatLng(14.6450, -90.5250), radius: 300, level: _RiskLevel.low),
-    _Hotspot(point: LatLng(14.6150, -90.4950), radius: 250, level: _RiskLevel.low),
-  ];
+  // Centro por defecto: Tuxtla Gutiérrez, Chiapas — la zona real donde opera
+  // el proyecto (antes apuntaba a Ciudad de Guatemala, dato simulado sin
+  // relación con los datos capturados). Se recalcula al promedio de las
+  // consultas reales con GPS en cuanto cargan, si hay alguna.
+  static final _center = LatLng(16.7569, -93.1292);
+  LatLng _centroActual = _center;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatos();
+  }
+
+  Future<void> _cargarDatos() async {
+    final repo = sl<PatientLocalRepository>();
+    final resultados = await Future.wait([
+      repo.getConsultasConUbicacion(),
+      repo.getResumenPorComunidad(),
+    ]);
+    final consultas = resultados[0] as List<ConsultaConUbicacion>;
+    final resumen = resultados[1] as List<ResumenComunidad>;
+    if (!mounted) return;
+    setState(() {
+      _consultas = consultas;
+      _resumenComunidades = resumen;
+      _cargando = false;
+    });
+    if (consultas.isNotEmpty) {
+      final lat = consultas.map((c) => c.latitud).reduce((a, b) => a + b) / consultas.length;
+      final lng = consultas.map((c) => c.longitud).reduce((a, b) => a + b) / consultas.length;
+      _centroActual = LatLng(lat, lng);
+      _mapController.move(_centroActual, 12.0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,8 +93,9 @@ class _MapaPageState extends State<MapaPage> {
                 _buildMap(),
                 _buildFilterRow(),
                 _buildZoomControls(),
-                if (_selectedDistrict != null)
-                  _buildInfoPanel(_selectedDistrict!),
+                if (_cargando) _buildLoadingBadge(),
+                if (!_cargando && _consultas.isEmpty) _buildEmptyBanner(),
+                if (_seleccionada != null) _buildInfoPanel(_seleccionada!),
               ],
             ),
       bottomNavigationBar: _buildBottomNav(),
@@ -106,6 +129,12 @@ class _MapaPageState extends State<MapaPage> {
       centerTitle: true,
       actions: [
         IconButton(
+          tooltip: 'Resumen por comunidad',
+          icon: Icon(Icons.groups_outlined,
+              color: AppColors.of(context).textSecondary, size: 22),
+          onPressed: _showResumenComunidades,
+        ),
+        IconButton(
           icon: Icon(Icons.cloud_outlined,
               color: AppColors.of(context).textSecondary, size: 22),
           onPressed: () {},
@@ -124,7 +153,7 @@ class _MapaPageState extends State<MapaPage> {
         initialZoom: 13.0,
         maxZoom: 18,
         minZoom: 5,
-        onTap: (_, tapPos) => setState(() => _selectedDistrict = null),
+        onTap: (_, __) => setState(() => _seleccionada = null),
       ),
       children: [
         TileLayer(
@@ -132,68 +161,108 @@ class _MapaPageState extends State<MapaPage> {
           userAgentPackageName: 'com.epidiagnostix.mayab.app',
           maxZoom: 19,
         ),
-        CircleLayer(
-          circles: _hotspots.map((h) {
-            final color = switch (h.level) {
-              _RiskLevel.high   => Color(0xFFDC2626),
-              _RiskLevel.medium => Color(0xFFD97706),
-              _RiskLevel.low    => Color(0xFF059669),
-            };
-            return CircleMarker(
-              point: h.point,
-              radius: h.radius,
-              useRadiusInMeter: true,
-              color: color.withValues(alpha: 0.20),
-              borderColor: color.withValues(alpha: 0.55),
-              borderStrokeWidth: 1.5,
-            );
-          }).toList(),
-        ),
         MarkerLayer(
-          markers: _hotspots.map((h) {
-            final (icon, color) = switch (h.level) {
-              _RiskLevel.high   => (Icons.warning_rounded, Color(0xFFDC2626)),
-              _RiskLevel.medium => (Icons.warning_amber_rounded, Color(0xFFD97706)),
-              _RiskLevel.low    => (Icons.info_outline_rounded, Color(0xFF059669)),
-            };
+          markers: _consultas.map((c) {
+            final esSeleccionada = _seleccionada?.id == c.id;
+            final primary = AppColors.of(context).primary;
             return Marker(
-              point: h.point,
-              width: 32,
-              height: 32,
+              point: LatLng(c.latitud, c.longitud),
+              width: 34,
+              height: 34,
               child: GestureDetector(
-                onTap: () => setState(() {
-                  _selectedDistrict = _DistrictInfo(
-                    name: 'Distrito ${h.level == _RiskLevel.high ? "7-A" : h.level == _RiskLevel.medium ? "3-B" : "5-C"}',
-                    risk: h.level,
-                    newCases: h.level == _RiskLevel.high ? 42 : h.level == _RiskLevel.medium ? 21 : 7,
-                    caseDelta: h.level == _RiskLevel.high ? '+12' : h.level == _RiskLevel.medium ? '+5' : '+1',
-                    testRate: h.level == _RiskLevel.high ? 8.4 : h.level == _RiskLevel.medium ? 4.2 : 1.8,
-                    recommendations: h.level == _RiskLevel.high
-                        ? ['Desplegar unidad móvil de pruebas en Sector B.', 'Priorizar distribución de refuerzos de vacuna.']
-                        : h.level == _RiskLevel.medium
-                            ? ['Aumentar vigilancia activa en el sector.', 'Reforzar medidas de higiene en centros comunitarios.']
-                            : ['Continuar seguimiento de contactos.', 'Mantener protocolos de prevención estándar.'],
-                  );
-                }),
+                onTap: () => setState(() => _seleccionada = c),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: esSeleccionada ? primary : Colors.white,
                     shape: BoxShape.circle,
+                    border: Border.all(color: primary, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.4),
-                        blurRadius: 6,
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 5,
                         offset: Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: Icon(icon, color: color, size: 18),
+                  child: Icon(
+                    Icons.medical_services_rounded,
+                    size: 16,
+                    color: esSeleccionada ? Colors.white : primary,
+                  ),
                 ),
               ),
             );
           }).toList(),
         ),
       ],
+    );
+  }
+
+  // ── Loading / empty states ───────────────────────────────────────────────
+  //
+  // Nada de esto se mostraba antes: el mapa viejo siempre pintaba 5 "hotspots"
+  // fijos sin importar si había datos reales o no. Aquí, sin consultas con
+  // GPS capturado, se dice explícitamente en vez de simular actividad.
+
+  Widget _buildLoadingBadge() {
+    return Positioned(
+      top: 60,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.of(context).surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: Offset(0, 2)),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 14, height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.of(context).primary),
+              ),
+              SizedBox(width: 8),
+              Text('Cargando consultas...', style: TextStyle(fontSize: 12, color: AppColors.of(context).textSecondary)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyBanner() {
+    return Positioned(
+      top: 60,
+      left: 12,
+      right: 12,
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.of(context).surface,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: AppColors.of(context).textMuted),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Aún no hay consultas con ubicación GPS registrada. Los marcadores aparecerán aquí en cuanto se capturen consultas con GPS activo.',
+                style: TextStyle(fontSize: 12, color: AppColors.of(context).textSecondary, height: 1.4),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -206,21 +275,32 @@ class _MapaPageState extends State<MapaPage> {
       right: 72,
       child: Row(
         children: [
-          _buildChip(
-            icon: Icons.coronavirus_outlined,
-            label: 'ENFERMEDAD: $_selectedDisease',
-            onTap: _showDiseaseSelector,
+          Flexible(
+            child: _buildChip(
+              icon: Icons.coronavirus_outlined,
+              label: 'ENFERMEDAD: $_selectedDisease',
+              onTap: _showDiseaseSelector,
+            ),
           ),
           SizedBox(width: 8),
-          _buildChip(
-            icon: Icons.date_range_rounded,
-            label: _selectedPeriod,
-            onTap: _showPeriodSelector,
+          Flexible(
+            child: _buildChip(
+              icon: Icons.date_range_rounded,
+              label: _periodoCorto(_selectedPeriod),
+              onTap: _showPeriodSelector,
+            ),
           ),
         ],
       ),
     );
   }
+
+  // Quita el prefijo redundante "Últimos " del label del chip (el selector
+  // completo, con el texto entero, se sigue mostrando en _showPeriodSelector)
+  // — evita truncar con "..." un texto corto donde perder la mitad de la
+  // palabra lo haría ilegible.
+  static String _periodoCorto(String periodo) =>
+      periodo.startsWith('Últimos ') ? periodo.substring(8) : periodo;
 
   Widget _buildChip({
     required IconData icon,
@@ -247,12 +327,16 @@ class _MapaPageState extends State<MapaPage> {
           children: [
             Icon(icon, size: 14, color: AppColors.of(context).primary),
             SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.of(context).textPrimary,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.of(context).textPrimary,
+                ),
               ),
             ),
             SizedBox(width: 4),
@@ -278,9 +362,7 @@ class _MapaPageState extends State<MapaPage> {
           _mapButton(Icons.remove, () => _mapController.move(
             _mapController.camera.center, _mapController.camera.zoom - 1)),
           SizedBox(height: 14),
-          _mapButton(Icons.my_location_rounded, () => _mapController.move(_center, 13.0)),
-          SizedBox(height: 6),
-          _mapButton(Icons.layers_outlined, () {}),
+          _mapButton(Icons.my_location_rounded, () => _mapController.move(_centroActual, 13.0)),
         ],
       ),
     );
@@ -308,14 +390,12 @@ class _MapaPageState extends State<MapaPage> {
     );
   }
 
-  // ── Info panel ────────────────────────────────────────────────────────────
+  // ── Info panel (consulta real seleccionada) ──────────────────────────────
 
-  Widget _buildInfoPanel(_DistrictInfo district) {
-    final (riskLabel, riskColor) = switch (district.risk) {
-      _RiskLevel.high   => ('ALTO RIESGO', Color(0xFFDC2626)),
-      _RiskLevel.medium => ('RIESGO MODERADO', Color(0xFFD97706)),
-      _RiskLevel.low    => ('RIESGO BAJO', Color(0xFF059669)),
-    };
+  Widget _buildInfoPanel(ConsultaConUbicacion c) {
+    final zona = (c.comunidad != null && c.comunidad!.isNotEmpty)
+        ? c.comunidad!
+        : (c.municipio ?? 'Sin zona registrada');
 
     return Positioned(
       bottom: 16,
@@ -326,152 +406,137 @@ class _MapaPageState extends State<MapaPage> {
           color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 14,
-              offset: Offset(0, 4),
-            ),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 14, offset: Offset(0, 4)),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Row(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          district.name,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.of(context).textPrimary,
-                          ),
+                          c.nombrePaciente,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.of(context).textPrimary),
                         ),
                         SizedBox(height: 2),
-                        Text(
-                          'Estado de Zona Seleccionada',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.of(context).textMuted,
-                          ),
-                        ),
+                        Text(zona, style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted)),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: riskColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      riskLabel,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  GestureDetector(
+                    onTap: () => setState(() => _seleccionada = null),
+                    child: Icon(Icons.close_rounded, size: 20, color: AppColors.of(context).textMuted),
                   ),
                 ],
               ),
+              Divider(height: 20, thickness: 1, color: Color(0xFFF3F4F6)),
+              _infoRow(Icons.calendar_today_outlined, 'Fecha de consulta', _formatFecha(c.fechaCaptura)),
+              if (c.categoriaSintoma != null && c.categoriaSintoma!.isNotEmpty) ...[
+                SizedBox(height: 8),
+                _infoRow(Icons.medical_information_outlined, 'Categoría de síntoma', c.categoriaSintoma!),
+              ],
+              SizedBox(height: 8),
+              _infoRow(Icons.my_location_rounded, 'Coordenadas GPS',
+                  '${c.latitud.toStringAsFixed(4)}, ${c.longitud.toStringAsFixed(4)}'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: AppColors.of(context).textMuted),
+        SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(text: '$label: ', style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted)),
+                TextSpan(text: value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.of(context).textPrimary)),
+              ],
             ),
-            Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
-            // Stats
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Resumen por comunidad ─────────────────────────────────────────────────
+
+  void _showResumenComunidades() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 4),
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildStatColumn(
-                      'Casos Nuevos',
-                      district.newCases.toString(),
-                      delta: '${district.caseDelta}%',
-                      deltaPositive: false,
-                    ),
-                  ),
-                  Container(width: 1, height: 40, color: Color(0xFFF3F4F6)),
-                  Expanded(
-                    child: _buildStatColumn(
-                      'Tasa de Pruebas',
-                      '${district.testRate}',
-                      suffix: '%',
-                    ),
+                    child: Text('Resumen por Comunidad',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
             ),
-            Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
-            // Recommendations
             Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RECOMENDACIONES',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.of(context).textMuted,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  ...district.recommendations.map((r) => Padding(
-                    padding: EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.warning_amber_rounded,
-                            size: 14, color: Color(0xFFD97706)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            r,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.of(context).textPrimary,
-                              height: 1.4,
-                            ),
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Pacientes y consultas registradas en este dispositivo, agrupados por comunidad.',
+                style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
+              ),
+            ),
+            Divider(height: 1),
+            Expanded(
+              child: _resumenComunidades.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aún no hay pacientes registrados.',
+                        style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      itemCount: _resumenComunidades.length,
+                      separatorBuilder: (_, __) => Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final r = _resumenComunidades[i];
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(r.zona, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              SizedBox(height: 4),
+                              Text(
+                                '${r.totalPacientes} paciente(s) · ${r.totalConsultas} consulta(s) · '
+                                'última visita: ${_formatFecha(r.ultimaVisita)}',
+                                style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  )),
-                ],
-              ),
-            ),
-            // CTA button
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 14),
-              child: SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.of(context).primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: Icon(Icons.bar_chart_rounded, size: 16),
-                  label: Text(
-                    'Análisis Completo de Zona',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -479,71 +544,10 @@ class _MapaPageState extends State<MapaPage> {
     );
   }
 
-  Widget _buildStatColumn(String label, String value,
-      {String? delta, bool deltaPositive = true, String? suffix}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: AppColors.of(context).textMuted,
-              letterSpacing: 0.3,
-            ),
-          ),
-          SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.of(context).textPrimary,
-                  height: 1,
-                ),
-              ),
-              if (suffix != null)
-                Padding(
-                  padding: EdgeInsets.only(bottom: 3, left: 2),
-                  child: Text(
-                    suffix,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.of(context).textSecondary,
-                    ),
-                  ),
-                ),
-              if (delta != null)
-                Padding(
-                  padding: EdgeInsets.only(bottom: 3, left: 6),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFFFE4E4),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      delta,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFDC2626),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
+  static String _formatFecha(DateTime dt) {
+    final d = dt.day.toString().padLeft(2, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    return '$d/$m/${dt.year}';
   }
 
   // ── Bottom nav ────────────────────────────────────────────────────────────
@@ -690,32 +694,4 @@ class _MapaPageState extends State<MapaPage> {
       },
     );
   }
-}
-
-// ── Data models ────────────────────────────────────────────────────────────────
-
-enum _RiskLevel { high, medium, low }
-
-class _Hotspot {
-  final LatLng point;
-  final double radius;
-  final _RiskLevel level;
-  _Hotspot({required this.point, required this.radius, required this.level});
-}
-
-class _DistrictInfo {
-  final String name;
-  final _RiskLevel risk;
-  final int newCases;
-  final String caseDelta;
-  final double testRate;
-  final List<String> recommendations;
-  _DistrictInfo({
-    required this.name,
-    required this.risk,
-    required this.newCases,
-    required this.caseDelta,
-    required this.testRate,
-    required this.recommendations,
-  });
 }

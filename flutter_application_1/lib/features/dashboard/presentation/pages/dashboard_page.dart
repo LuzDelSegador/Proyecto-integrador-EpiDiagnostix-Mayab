@@ -162,11 +162,15 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() => _sincronizando = false);
     await _loadStats();
     if (!mounted) return;
-    final mensaje = resumen.huboError
-        ? 'No se pudo sincronizar (sin conexión o servidor dormido). Se reintentará.'
-        : (resumen.pacientesSincronizados == 0 && resumen.atencionesSincronizadas == 0)
-            ? 'Todo está sincronizado.'
-            : 'Sincronizado: ${resumen.pacientesSincronizados} paciente(s), ${resumen.atencionesSincronizadas} consulta(s).';
+    final mensaje = resumen.pacientesConError > 0
+        ? (resumen.pacientesConError == 1
+            ? '1 paciente no se pudo sincronizar (dato inválido) — revísalo en Casos.'
+            : '${resumen.pacientesConError} pacientes no se pudieron sincronizar (dato inválido) — revísalos en Casos.')
+        : resumen.huboError
+            ? 'No se pudo sincronizar (sin conexión o servidor dormido). Se reintentará.'
+            : (resumen.pacientesSincronizados == 0 && resumen.atencionesSincronizadas == 0)
+                ? 'Todo está sincronizado.'
+                : 'Sincronizado: ${resumen.pacientesSincronizados} paciente(s), ${resumen.atencionesSincronizadas} consulta(s).';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(mensaje), behavior: SnackBarBehavior.floating),
     );

@@ -8,11 +8,13 @@ import 'package:provider/provider.dart';
 import 'core/constants/app_config.dart';
 import 'core/constants/app_theme.dart';
 import 'core/di/injection_container.dart' as di;
+import 'core/navigation/root_messenger.dart';
 import 'core/services/token_storage.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'features/sync/data/sync_service.dart';
+import 'features/sync/presentation/sync_feedback.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +56,9 @@ class _EpiDiagnostixMayabAppState extends State<EpiDiagnostixMayabApp> {
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
       if (results.every((r) => r == ConnectivityResult.none)) return;
       if (!await di.sl<TokenStorage>().hasToken()) return;
-      di.sl<SyncService>().syncAll().catchError((_) => const SyncResumen());
+      di.sl<SyncService>().syncAll().then((resumen) {
+        mostrarResultadoSyncSiHayError(resumen, rootScaffoldMessengerKey);
+      }).catchError((_) {});
     });
   }
 
@@ -70,6 +74,7 @@ class _EpiDiagnostixMayabAppState extends State<EpiDiagnostixMayabApp> {
       create: (_) => di.sl<AuthProvider>(),
       child: MaterialApp(
         title: 'EpiDiagnostix-Mayab',
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,

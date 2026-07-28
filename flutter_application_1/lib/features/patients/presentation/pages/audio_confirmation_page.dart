@@ -5,11 +5,13 @@ import 'package:geolocator/geolocator.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_config.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/navigation/root_messenger.dart';
 import '../../../../core/services/token_storage.dart';
 import '../../data/models/patient_record.dart';
 import '../../data/repositories/patient_local_repository.dart';
 import '../../../attentions/data/models/medicamento.dart';
 import '../../../sync/data/sync_service.dart';
+import '../../../sync/presentation/sync_feedback.dart';
 
 enum _GpsStatus { loading, ready, unavailable }
 
@@ -417,8 +419,11 @@ class _AudioConfirmationPageState extends State<AudioConfirmationPage> {
     _syncToMl();
     // Fire-and-forget: empuja lo pendiente (esta consulta y cualquier otra
     // cosa en el outbox) a MS1/MS2. Si falla, ya quedó en SQLite y se
-    // reintenta en el próximo trigger.
-    sl<SyncService>().syncAll().catchError((_) => SyncResumen());
+    // reintenta en el próximo trigger. Si el backend rechaza algún paciente
+    // pendiente (ej. CURP inválido), se avisa vía snackbar global.
+    sl<SyncService>().syncAll().then((resumen) {
+      mostrarResultadoSyncSiHayError(resumen, rootScaffoldMessengerKey);
+    }).catchError((_) {});
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

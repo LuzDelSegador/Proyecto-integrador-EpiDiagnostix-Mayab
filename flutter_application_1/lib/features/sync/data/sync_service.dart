@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../../core/services/device_id_service.dart';
 import '../../attentions/data/datasources/atencion_remote_datasource.dart';
 import '../../attentions/data/mappers/atencion_payload_mapper.dart';
@@ -13,11 +15,15 @@ import '../../patients/data/repositories/patient_local_repository.dart';
 
 class SyncResumen {
   final int pacientesSincronizados;
+  final int pacientesConError;
+  final String? primerErrorPaciente;
   final int atencionesSincronizadas;
   final bool huboError;
 
   const SyncResumen({
     this.pacientesSincronizados = 0,
+    this.pacientesConError = 0,
+    this.primerErrorPaciente,
     this.atencionesSincronizadas = 0,
     this.huboError = false,
   });
@@ -45,6 +51,8 @@ class SyncService {
       final atencionesOk = await _syncAtencionesPendientes();
       return SyncResumen(
         pacientesSincronizados: pacientesOk.cantidad,
+        pacientesConError: pacientesOk.conError,
+        primerErrorPaciente: pacientesOk.primerError,
         atencionesSincronizadas: atencionesOk.cantidad,
         huboError: pacientesOk.huboError || atencionesOk.huboError,
       );
@@ -55,12 +63,18 @@ class SyncService {
 
   Future<_Resultado> _syncPacientesPendientes() async {
     final pendientes = await _localRepo.getPacientesPendientesSync();
+    debugPrint('[SYNC-DEBUG] pacientes pendientes en outbox (sincronizado=0 AND curp IS NOT NULL): ${pendientes.length}');
     if (pendientes.isEmpty) return const _Resultado(0, false);
 
     // El backend valida el body completo antes de procesar nada: un solo
     // registro incompleto invalida el lote entero, así que se filtran aquí.
     final listos = pendientes.where(_pacienteListoParaSync).toList();
-    if (listos.isEmpty) return const _Resultado(0, false);
+    debugPrint('[SYNC-DEBUG] de esos, pasan _pacienteListoParaSync (curp>=18, fecha_nacimiento, municipio no vacío): ${listos.length}');
+    if (listos.isEmpty) {
+      debugPrint('[SYNC-DEBUG] ninguno listo -> no se llama a POST /pacientes/sync. Nombres descartados: '
+          '${pendientes.map((p) => p.nombreCompleto).toList()}');
+      return const _Resultado(0, false);
+    }
 
     final dispositivoId = await _deviceId.getDeviceId();
     final payloads = listos
@@ -77,21 +91,50 @@ class SyncService {
             ))
         .toList();
 
+    debugPrint('[SYNC-DEBUG] POST /pacientes/sync -> dispositivo_id=$dispositivoId, '
+        'nombres=${listos.map((p) => p.nombreCompleto).toList()}, device_generated_ids=${listos.map((p) => p.id).toList()}');
     try {
       final resultados = await _pacienteDs.sync(
         dispositivoId: dispositivoId,
         pacientes: payloads,
       );
+      debugPrint('[SYNC-DEBUG] POST /pacientes/sync OK -> ${resultados.length} resultado(s): '
+          '${resultados.map((r) => '${r.deviceGeneratedId}->${r.idServidor} (${r.estado})').toList()}');
+
+      // El HTTP 200 es del lote completo — el éxito/fallo REAL de cada
+      // paciente vive en su "estado" individual (ej. "creado" vs "error:
+      // CURP inválido: ..."). Solo "creado" + id_servidor no vacío cuenta
+      // como éxito; cualquier otra cosa se trata como rechazo (mejor un
+      // falso "pendiente" que otro falso positivo de sincronizado=1).
+      var exitosos = 0;
+      final erroresMensajes = <String>[];
       for (final r in resultados) {
-        await _localRepo.marcarPacienteSincronizado(r.deviceGeneratedId, r.idServidor);
+        final esExito = _estadosExitososPaciente.contains(r.estado) && r.idServidor.isNotEmpty;
+        if (esExito) {
+          await _localRepo.marcarPacienteSincronizado(r.deviceGeneratedId, r.idServidor);
+          exitosos++;
+        } else {
+          debugPrint('[SYNC-DEBUG] paciente ${r.deviceGeneratedId} RECHAZADO por backend -> estado="${r.estado}"');
+          await _localRepo.registrarErrorSyncPaciente(r.deviceGeneratedId, r.estado);
+          erroresMensajes.add(r.estado);
+        }
       }
-      return _Resultado(resultados.length, false);
-    } catch (_) {
-      // Sin red, cold-start, o 422 de validación — se reintenta en el
-      // próximo trigger (conexión recuperada / botón manual / próximo guardado).
+      return _Resultado(
+        exitosos,
+        erroresMensajes.isNotEmpty,
+        conError: erroresMensajes.length,
+        primerError: erroresMensajes.isEmpty ? null : erroresMensajes.first,
+      );
+    } catch (e) {
+      // Sin red, cold-start, timeout — a diferencia de un rechazo por
+      // registro, esto SÍ se reintenta solo en el próximo trigger, así que
+      // no se marca conError (evita alarmar al usuario por algo transitorio).
+      debugPrint('[SYNC-DEBUG] POST /pacientes/sync FALLÓ (red/HTTP): ${e.runtimeType} -> $e');
       return const _Resultado(0, true);
     }
   }
+
+  static const _estadosExitososPaciente = {'creado'};
 
   bool _pacienteListoParaSync(Paciente p) =>
       p.curp != null &&
@@ -161,5 +204,10 @@ class SyncService {
 class _Resultado {
   final int cantidad;
   final bool huboError;
-  const _Resultado(this.cantidad, this.huboError);
+  // Solo para rechazos POR REGISTRO del backend (estado != éxito) — NO para
+  // fallas de red/timeout, que son transitorias y no necesitan interrumpir
+  // al usuario porque el próximo trigger las reintenta solas.
+  final int conError;
+  final String? primerError;
+  const _Resultado(this.cantidad, this.huboError, {this.conError = 0, this.primerError});
 }

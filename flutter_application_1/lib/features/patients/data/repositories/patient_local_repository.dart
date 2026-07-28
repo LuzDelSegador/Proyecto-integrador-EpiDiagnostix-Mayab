@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../models/paciente.dart';
 import '../models/patient_record.dart';
+import 'package:flutter/foundation.dart';
 
 class PatientLocalRepository {
   static const _dbName     = 'epidiagnostix.db';
@@ -21,7 +22,7 @@ class PatientLocalRepository {
     final dbPath = await getDatabasesPath();
     return openDatabase(
       join(dbPath, _dbName),
-      version: 6,
+      version: 7,
       onCreate: (db, _) async {
         await _createPacientesTable(db);
         await _createConsultasTable(db);
@@ -59,6 +60,11 @@ class PatientLocalRepository {
         } else if (oldVersion == 5) {
           await _agregarColumnasV6(db);
         }
+        // Bloque final (no exclusivo con los anteriores): agrega ultimo_error_sync
+        // sin importar de qué oldVersion se venga, siempre que aún no exista.
+        if (oldVersion < 7 && newVersion >= 7) {
+          await _agregarColumnasV7(db);
+        }
       },
     );
   }
@@ -74,6 +80,14 @@ class PatientLocalRepository {
     await db.execute('ALTER TABLE $_tPacientes ADD COLUMN contacto_emergencia TEXT');
     await db.execute('ALTER TABLE $_tPacientes ADD COLUMN remote_id TEXT');
     await db.execute('ALTER TABLE $_tConsultas ADD COLUMN remote_id TEXT');
+  }
+
+  // Migración v6→v7: guarda el motivo real por el que el backend rechazó un
+  // paciente en POST /pacientes/sync (antes se ignoraba el campo "estado" por
+  // registro y se marcaba sincronizado=1 aunque el backend hubiera devuelto
+  // "error: ...", produciendo falsos positivos).
+  Future<void> _agregarColumnasV7(Database db) async {
+    await db.execute('ALTER TABLE $_tPacientes ADD COLUMN ultimo_error_sync TEXT');
   }
 
   Future<void> _createPacientesTable(Database db) => db.execute('''
@@ -92,7 +106,8 @@ class PatientLocalRepository {
       municipio            TEXT,
       lengua_materna       TEXT,
       contacto_emergencia  TEXT,
-      remote_id            TEXT
+      remote_id            TEXT,
+      ultimo_error_sync    TEXT
     )
   ''');
 
@@ -254,13 +269,48 @@ class PatientLocalRepository {
   }
 
   /// Marca un paciente local como sincronizado y guarda el id que devolvió MS1.
+  /// Limpia ultimo_error_sync por si un intento previo había fallado.
   Future<void> marcarPacienteSincronizado(String localId, String remoteId) async {
     final db = await _database;
     await db.update(
       _tPacientes,
-      {'sincronizado': 1, 'remote_id': remoteId},
+      {'sincronizado': 1, 'remote_id': remoteId, 'ultimo_error_sync': null},
       where:     'id = ?',
       whereArgs: [localId],
+    );
+  }
+
+  /// Registra que el backend RECHAZÓ este paciente en POST /pacientes/sync
+  /// (estado distinto de éxito, ej. "error: CURP inválido..."). No lo marca
+  /// como sincronizado — sincronizado se deja en 0 explícitamente para que
+  /// quede claro que nunca llegó, y se guarda el motivo para poder mostrarlo.
+  Future<void> registrarErrorSyncPaciente(String localId, String mensaje) async {
+    final db = await _database;
+    await db.update(
+      _tPacientes,
+      {'sincronizado': 0, 'ultimo_error_sync': mensaje},
+      where:     'id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  /// TEMPORAL — limpieza de datos de prueba (bug del 2026-07-27 ya corregido):
+  /// antes de este fix, cualquier resultado de POST /pacientes/sync se
+  /// marcaba sincronizado=1 sin revisar "estado", así que algunos pacientes
+  /// quedaron con sincronizado=1 pero remote_id vacío (falso positivo real,
+  /// nunca llegaron al backend). Este método los revierte a sincronizado=0
+  /// para que el próximo sync los reintente de verdad. Bórrala después de
+  /// correrla una vez sobre los dispositivos de prueba.
+  Future<int> debugResetearFalsosPositivosSync() async {
+    final db = await _database;
+    return db.update(
+      _tPacientes,
+      {
+        'sincronizado': 0,
+        'ultimo_error_sync': 'Reprocesado manualmente: falso positivo de sync detectado antes del fix del 2026-07-27.',
+      },
+      where:     'sincronizado = 1 AND (remote_id IS NULL OR remote_id = ?)',
+      whereArgs: [''],
     );
   }
 
@@ -344,6 +394,7 @@ class PatientLocalRepository {
         lenguaMaterna:      r['lengua_materna'] as String?,
         contactoEmergencia: r['contacto_emergencia'] as String?,
         remoteId:           r['remote_id'] as String?,
+        ultimoErrorSync:    r['ultimo_error_sync'] as String?,
       );
 
   /// Devuelve todos los pacientes ordenados por ultima_visita DESC.
@@ -374,6 +425,10 @@ class PatientLocalRepository {
         : [hace7d, hace30d];
 
     final rows = await db.rawQuery(sql, args);
+
+    debugPrint('PACIENTES ENCONTRADOS: ${rows.length}');
+    debugPrint('DATOS: $rows');
+
     return rows.map((r) => PacienteConResumen(
       paciente: _pacienteFromRow(r),
       visitasEstaSemana: r['visitas_esta_semana'] as int,
@@ -414,6 +469,67 @@ class PatientLocalRepository {
         longitud:          _toDouble(r['longitud']),
       );
     }).toList();
+  }
+
+  /// Consultas con coordenadas GPS reales (capturadas por Geolocator al
+  /// guardar la consulta, NO geocodificadas desde comunidad/municipio) —
+  /// para pintar marcadores reales en el Mapa. Cobertura parcial: solo las
+  /// consultas donde el permiso de ubicación estuvo disponible.
+  Future<List<ConsultaConUbicacion>> getConsultasConUbicacion() async {
+    final db = await _database;
+    final rows = await db.rawQuery('''
+      SELECT c.id, c.fecha_captura, c.campos_extraidos, c.latitud, c.longitud,
+             p.nombre_completo, p.comunidad, p.municipio
+      FROM $_tConsultas c
+      JOIN $_tPacientes p ON p.id = c.paciente_id
+      WHERE c.latitud IS NOT NULL AND c.longitud IS NOT NULL
+      ORDER BY c.fecha_captura DESC
+    ''');
+
+    return rows.map((r) {
+      Map<String, dynamic> campos;
+      try {
+        campos = jsonDecode(r['campos_extraidos'] as String) as Map<String, dynamic>;
+      } catch (_) {
+        campos = {};
+      }
+      return ConsultaConUbicacion(
+        id:               r['id'] as String,
+        fechaCaptura:     DateTime.parse(r['fecha_captura'] as String),
+        nombrePaciente:   r['nombre_completo'] as String,
+        comunidad:        r['comunidad'] as String?,
+        municipio:        r['municipio'] as String?,
+        categoriaSintoma: campos['categoria_sintoma'] as String?,
+        latitud:          r['latitud'] as double,
+        longitud:         r['longitud'] as double,
+      );
+    }).toList();
+  }
+
+  /// Resumen real por comunidad (o municipio si el paciente no tiene
+  /// comunidad capturada): pacientes, consultas y última visita. Agregación
+  /// SQL local — no requiere geocodificación ni un endpoint nuevo en el
+  /// backend.
+  Future<List<ResumenComunidad>> getResumenPorComunidad() async {
+    final db = await _database;
+    final rows = await db.rawQuery('''
+      SELECT
+        COALESCE(NULLIF(TRIM(p.comunidad), ''), NULLIF(TRIM(p.municipio), ''), 'Sin comunidad registrada') AS zona,
+        COUNT(DISTINCT p.id) AS total_pacientes,
+        COUNT(c.id) AS total_consultas,
+        MAX(p.ultima_visita) AS ultima_visita
+      FROM $_tPacientes p
+      LEFT JOIN $_tConsultas c ON c.paciente_id = p.id
+      GROUP BY zona
+      ORDER BY total_pacientes DESC
+    ''');
+
+    return rows.map((r) => ResumenComunidad(
+      zona:            r['zona'] as String,
+      totalPacientes:  r['total_pacientes'] as int,
+      totalConsultas:  r['total_consultas'] as int,
+      ultimaVisita:    DateTime.parse(r['ultima_visita'] as String),
+    )).toList();
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

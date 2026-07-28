@@ -2,7 +2,7 @@ name: flutter_application_1
 description: "EpiDiagnostix-Mayab - Portal de Vigilancia Epidemiológica"
 publish_to: 'none'
 
-version: 3.0.0+3
+version: 3.0.0+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

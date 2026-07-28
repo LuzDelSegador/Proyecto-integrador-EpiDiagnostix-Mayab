@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/navigation/root_messenger.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/constants/user_roles.dart';
 import '../../../patients/data/mappers/sexo_mapper.dart';
 import '../../../patients/data/repositories/patient_local_repository.dart';
 import '../../../plans/presentation/pages/planes_page.dart';
 import '../../../sync/data/sync_service.dart';
+import '../../../sync/presentation/sync_feedback.dart';
 import 'new_patient_selection_page.dart';
+
+/// CURP oficial: 4 letras + AAMMDD + H/M + 5 letras (estado, consonantes
+/// internas x3, primera consonante interna de la madre... según algoritmo
+/// oficial, no lo replicamos aquí) + 1 alfanumérico + 1 dígito verificador.
+final _curpRegex = RegExp(r'^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$');
 
 /// Alta/identidad de paciente (MS1): captura CURP y los datos que exige
 /// POST /pacientes. Es el paso obligatorio antes de capturar cualquier
@@ -105,8 +112,12 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
 
       // Fire-and-forget: si hay red, empuja el alta a MS1 en segundo plano.
       // Si falla (sin red, cold-start), el paciente ya quedó en SQLite y se
-      // reintentará en el próximo trigger de sincronización.
-      sl<SyncService>().syncAll().catchError((_) => SyncResumen());
+      // reintentará en el próximo trigger de sincronización. Si el backend
+      // lo RECHAZA (ej. CURP inválido), el usuario se entera vía snackbar
+      // aunque para entonces ya haya navegado a otra pantalla.
+      sl<SyncService>().syncAll().then((resumen) {
+        mostrarResultadoSyncSiHayError(resumen, rootScaffoldMessengerKey);
+      }).catchError((_) {});
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -254,9 +265,11 @@ class _PatientRegistrationPageState extends State<PatientRegistrationPage> {
           maxLength: 18,
           decoration: _inputDecoration('18 caracteres').copyWith(counterText: ''),
           validator: (v) {
-            final val = v?.trim() ?? '';
+            final val = (v ?? '').trim().toUpperCase();
             if (val.isEmpty) return 'Ingresa el CURP';
-            if (val.length != 18) return 'El CURP debe tener 18 caracteres';
+            if (!_curpRegex.hasMatch(val)) {
+              return 'Formato de CURP inválido. Ejemplo: GOMC900101HCSNZL09';
+            }
             return null;
           },
         ),

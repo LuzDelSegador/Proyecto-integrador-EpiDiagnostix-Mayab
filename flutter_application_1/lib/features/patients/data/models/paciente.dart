@@ -15,6 +15,7 @@ class Paciente {
   final String? lenguaMaterna;
   final String? contactoEmergencia;
   final String? remoteId; // id devuelto por MS1 una vez sincronizado
+  final String? ultimoErrorSync; // motivo del último rechazo de POST /pacientes/sync, si lo hubo
 
   const Paciente({
     required this.id,
@@ -31,6 +32,7 @@ class Paciente {
     this.lenguaMaterna,
     this.contactoEmergencia,
     this.remoteId,
+    this.ultimoErrorSync,
   });
 }
 
@@ -43,6 +45,49 @@ class PacienteConResumen {
     required this.paciente,
     required this.visitasEstaSemana,
     required this.visitasEsteMes,
+  });
+}
+
+/// Una consulta con coordenadas GPS reales (capturadas por Geolocator en el
+/// momento de guardar la consulta, no geocodificadas). Solo existen instancias
+/// de esto para consultas donde el permiso de ubicación estuvo disponible —
+/// no todas las consultas tienen coordenadas.
+class ConsultaConUbicacion {
+  final String id;
+  final DateTime fechaCaptura;
+  final String nombrePaciente;
+  final String? comunidad;
+  final String? municipio;
+  final String? categoriaSintoma;
+  final double latitud;
+  final double longitud;
+
+  const ConsultaConUbicacion({
+    required this.id,
+    required this.fechaCaptura,
+    required this.nombrePaciente,
+    this.comunidad,
+    this.municipio,
+    this.categoriaSintoma,
+    required this.latitud,
+    required this.longitud,
+  });
+}
+
+/// Agregación real (SQL local, sin geocodificación ni backend nuevo) de
+/// pacientes/consultas por comunidad — o municipio si el paciente no tiene
+/// comunidad capturada.
+class ResumenComunidad {
+  final String zona;
+  final int totalPacientes;
+  final int totalConsultas;
+  final DateTime ultimaVisita;
+
+  const ResumenComunidad({
+    required this.zona,
+    required this.totalPacientes,
+    required this.totalConsultas,
+    required this.ultimaVisita,
   });
 }
 
